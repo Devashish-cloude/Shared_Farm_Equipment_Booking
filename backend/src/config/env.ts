@@ -8,6 +8,15 @@ dotenv.config();
 export const config = {
   port: parseInt(process.env.PORT || '5001', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
+  databaseUrl: process.env.DATABASE_URL,
+  databasePoolMax: parseInt(process.env.DB_POOL_MAX || '10', 10),
+  databaseIdleTimeoutMs: parseInt(process.env.DB_IDLE_TIMEOUT_MS || '10000', 10),
+  databaseConnectionTimeoutMs: parseInt(process.env.DB_CONNECTION_TIMEOUT_MS || '5000', 10),
+  databaseSsl: process.env.DB_SSL === 'true',
+  databaseSslRejectUnauthorized:
+    process.env.NODE_ENV === 'production' ||
+    process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false',
+  databaseMigrationLockKey: process.env.DB_MIGRATION_LOCK_KEY || 'shared-farm-schema-migrations',
   jwtSecret: process.env.JWT_SECRET || 'shared_farm_jwt_super_secret_key_2026',
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
   razorpayKeyId: process.env.RAZORPAY_KEY_ID || 'rzp_test_placeholder_key_id',
