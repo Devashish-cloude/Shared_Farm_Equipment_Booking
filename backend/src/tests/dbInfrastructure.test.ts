@@ -1,11 +1,14 @@
 import crypto from 'node:crypto';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { config } from '../config/env.js';
 import { classifyDatabaseError } from '../db/errors.js';
-import { runMigrations } from '../db/migrate.js';
+import {
+  DEFAULT_MIGRATION_DIRECTORY,
+  runMigrations,
+} from '../db/migrate.js';
 import { getDatabasePool, shutdownDatabasePool } from '../db/pool.js';
 import { expectedConstraints, inspectExistingSchema } from '../db/schemaInspection.js';
 import { withTransaction } from '../db/transaction.js';
@@ -16,6 +19,7 @@ class FakeClient {
   public released = false;
   public existingSchema = false;
   public appliedRows: Array<{ version: string; checksum: string }> = [];
+  public failOnMigrationSql = false;
 
   async query<T = Record<string, unknown>>(
     text: string,
@@ -50,6 +54,9 @@ class FakeClient {
     if (text.includes('INSERT INTO schema_migrations')) {
       const [version, checksum] = values as [string, string];
       this.appliedRows.push({ version, checksum });
+    }
+    if (this.failOnMigrationSql && text.includes('FAIL MIGRATION')) {
+      throw new Error('migration SQL failed');
     }
     return { rows: [] as T[] };
   }
@@ -103,6 +110,15 @@ afterEach(async () => {
 });
 
 describe('PostgreSQL Phase 1 infrastructure', () => {
+  it('resolves the default migration directory from the repository root', async () => {
+    await expect(readdir(DEFAULT_MIGRATION_DIRECTORY)).resolves.toEqual(
+      expect.arrayContaining([
+        '001_initial_schema.sql',
+        '002_person3_modules.sql',
+      ])
+    );
+  });
+
   it('requires DATABASE_URL before creating a pool', () => {
     const original = config.databaseUrl;
     config.databaseUrl = undefined;
@@ -176,6 +192,28 @@ describe('PostgreSQL Phase 1 infrastructure', () => {
     }
   });
 
+  it('rolls back, unlocks, and releases the client when migration SQL fails', async () => {
+    const migrationDir = await mkdtemp(path.join(os.tmpdir(), 'shared-farm-migration-failure-'));
+    try {
+      await writeFile(path.join(migrationDir, '001_failure.sql'), 'FAIL MIGRATION');
+      const pool = new FakePool();
+      pool.client.failOnMigrationSql = true;
+
+      await expect(runMigrations(pool, migrationDir)).rejects.toThrow(
+        'migration SQL failed'
+      );
+
+      const calls = pool.client.calls.map((call) => call.text);
+      expect(calls).toContain('BEGIN');
+      expect(calls).toContain('ROLLBACK');
+      expect(calls[calls.length - 1]).toContain('pg_advisory_unlock');
+      expect(pool.client.released).toBe(true);
+      expect(pool.client.appliedRows).toHaveLength(0);
+    } finally {
+      await rm(migrationDir, { recursive: true, force: true });
+    }
+  });
+
   it('does not replay a baseline migration on an existing schema with partial history', async () => {
     const migrationDir = await mkdtemp(path.join(os.tmpdir(), 'shared-farm-partial-history-'));
     try {
@@ -235,6 +273,55 @@ describe('PostgreSQL Phase 1 infrastructure', () => {
       'requires --confirm'
     );
     expect(pool.client.released).toBe(false);
+  });
+
+  it('rejects incompatible adoption and releases the locked client', async () => {
+    const migrationDir = await mkdtemp(path.join(os.tmpdir(), 'shared-farm-incompatible-adoption-'));
+    try {
+      const pool = new FakePool();
+      pool.client.existingSchema = true;
+
+      await expect(adoptExisting(pool, migrationDir, true)).rejects.toThrow(
+        'Existing schema is incompatible'
+      );
+
+      const calls = pool.client.calls.map((call) => call.text);
+      expect(calls[calls.length - 1]).toContain('pg_advisory_unlock');
+      expect(calls.some((call) => call === 'BEGIN')).toBe(false);
+      expect(pool.client.released).toBe(true);
+    } finally {
+      await rm(migrationDir, { recursive: true, force: true });
+    }
+  });
+
+  it('refuses adoption when migration history already exists', async () => {
+    const migrationDir = await mkdtemp(path.join(os.tmpdir(), 'shared-farm-ledgered-adoption-'));
+    try {
+      const pool = new FakePool();
+      pool.client.existingSchema = true;
+      pool.client.appliedRows = [{ version: 'existing', checksum: 'checksum' }];
+      const originalQuery = pool.client.query.bind(pool.client);
+      pool.client.query = async <T = Record<string, unknown>>(
+        text: string,
+        values?: unknown[]
+      ): Promise<{ rows: T[] }> => {
+        if (text.includes('information_schema.tables')) {
+          return { rows: expectedTables.map((table_name) => ({ table_name })) as T[] };
+        }
+        if (text.includes('information_schema.columns')) {
+          return { rows: expectedColumns.map(([table_name, column_name]) => ({ table_name, column_name })) as T[] };
+        }
+        return originalQuery(text, values);
+      };
+
+      await expect(adoptExisting(pool, migrationDir, true)).rejects.toThrow(
+        'Migration history already exists'
+      );
+      expect(pool.client.calls.some((call) => call.text === 'BEGIN')).toBe(false);
+      expect(pool.client.released).toBe(true);
+    } finally {
+      await rm(migrationDir, { recursive: true, force: true });
+    }
   });
 
   it('adopts a compatible existing schema by recording baselines without replaying SQL', async () => {

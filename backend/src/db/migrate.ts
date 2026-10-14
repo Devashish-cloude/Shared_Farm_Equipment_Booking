@@ -24,6 +24,11 @@ export interface MigrationFile {
   sql: string;
 }
 
+export const DEFAULT_MIGRATION_DIRECTORY = path.resolve(
+  __dirname,
+  '../../../database/migrations'
+);
+
 const migrationLedgerSql = `
   CREATE TABLE IF NOT EXISTS schema_migrations (
     version VARCHAR(255) PRIMARY KEY,
@@ -148,7 +153,7 @@ export async function runMigrations(
 }
 
 export async function migrate(
-  migrationDir = path.resolve(process.cwd(), 'database', 'migrations')
+  migrationDir = DEFAULT_MIGRATION_DIRECTORY
 ): Promise<void> {
   const pool = getDatabasePool();
   try {

@@ -1,4 +1,5 @@
 import express, { Request, Response, NextFunction } from 'express';
+import { IncomingMessage, ServerResponse } from 'http';
 import cors from 'cors';
 import authRoutes from './routes/authRoutes.js';
 import equipmentRoutes from './routes/equipmentRoutes.js';
@@ -8,18 +9,24 @@ import paymentRoutes from './routes/paymentRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import reviewRoutes from './routes/reviewRoutes.js';
 
+export function attachJsonRawBody(
+  req: IncomingMessage & { rawBody?: string },
+  _res: ServerResponse,
+  buf: Buffer
+): void {
+  req.rawBody = buf.toString('utf8');
+}
+
 export const createApp = () => {
   const app = express();
 
   // Middleware
   app.use(cors());
 
-  // JSON parser with rawBody preservation for Razorpay webhook cryptographic checks
+  // JSON parser with rawBody preservation for Razorpay webhook HMAC. Must run before routes.
   app.use(
     express.json({
-      verify: (req: any, _res, buf) => {
-        req.rawBody = buf.toString('utf8');
-      },
+      verify: attachJsonRawBody,
     })
   );
 

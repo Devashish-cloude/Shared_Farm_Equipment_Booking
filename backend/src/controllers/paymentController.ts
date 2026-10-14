@@ -1,10 +1,28 @@
-import { Response } from 'express';
+import { NextFunction, Response } from 'express';
 import crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 import { store } from '../services/store.js';
 import { NotificationService } from '../services/notificationService.js';
 import { config } from '../config/env.js';
 import { AuthenticatedRequest, Payment } from '../types/index.js';
+import { config as appConfig } from '../config/env.js';
+import {
+  PaymentService,
+  PaymentServiceError,
+  evaluatePaymentCapture,
+  isDemoSimulationAllowed,
+  verifyPaymentSignature,
+  verifyWebhookSignature,
+} from '../services/paymentService.js';
+import { getDatabasePool } from '../db/pool.js';
+
+function usePostgres(): boolean {
+  return Boolean(appConfig.databaseUrl);
+}
+
+function paymentService(): PaymentService {
+  return new PaymentService(getDatabasePool());
+}
 
 export class PaymentController {
   /**
@@ -16,9 +34,7 @@ export class PaymentController {
     signature: string,
     secret: string
   ): boolean {
-    const text = `${orderId}|${paymentId}`;
-    const generated = crypto.createHmac('sha256', secret).update(text).digest('hex');
-    return generated === signature;
+    return verifyPaymentSignature(orderId, paymentId, signature, secret);
   }
 
   /**
@@ -33,7 +49,7 @@ export class PaymentController {
    * POST /api/payments/create-order
    * Create Razorpay order using authoritative backend price.
    */
-  public static createOrder(req: AuthenticatedRequest, res: Response): void {
+  public static async createOrder(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
     const { bookingId } = req.body;
 
     if (!bookingId) {
@@ -41,6 +57,37 @@ export class PaymentController {
       return;
     }
 
+    if (usePostgres()) {
+      try {
+        const result = await paymentService().createOrder(bookingId, req.user!.id, Boolean(req.user!.is_admin));
+        res.status(201).json({
+          success: true,
+          message: 'Razorpay payment order created successfully.',
+          data: {
+            orderId: result.payment.razorpay_order_id,
+            amount: Math.round(result.booking.total_price * 100),
+            currency: result.payment.currency,
+            amountInRupees: result.booking.total_price,
+            keyId: appConfig.razorpayKeyId,
+            bookingId: result.booking.id,
+            bookingSummary: {
+              totalHours: result.booking.total_hours,
+              hourlyRate: result.booking.hourly_rate,
+              basePrice: result.booking.base_price,
+              platformFee: result.booking.platform_fee,
+              totalPrice: result.booking.total_price,
+            },
+          },
+        });
+      } catch (error) {
+        if (error instanceof PaymentServiceError) {
+          res.status(error.status).json({ success: false, error: error.message });
+          return;
+        }
+        next(error);
+      }
+      return;
+    }
     const booking = store.getBookingById(bookingId);
     if (!booking) {
       res.status(404).json({ success: false, error: 'Booking not found.' });
@@ -80,7 +127,7 @@ export class PaymentController {
       amount: booking.total_price,
       currency: 'INR',
       status: 'created',
-      idempotency_key: `order_init_${booking.id}`,
+      idempotency_key: `order_init_${uuidv4()}`,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -113,7 +160,7 @@ export class PaymentController {
    * POST /api/payments/verify
    * Verify Razorpay payment signature and capture payment idempotently.
    */
-  public static verifyPayment(req: AuthenticatedRequest, res: Response): void {
+  public static async verifyPayment(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature, is_demo_simulated } = req.body;
 
     if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
@@ -124,6 +171,39 @@ export class PaymentController {
       return;
     }
 
+    if (usePostgres()) {
+      try {
+        const result = await paymentService().verify(
+          razorpay_order_id,
+          razorpay_payment_id,
+          razorpay_signature,
+          req.user!.id,
+          Boolean(req.user!.is_admin),
+          appConfig.razorpayKeySecret,
+          isDemoSimulationAllowed(Boolean(is_demo_simulated), appConfig.paymentAllowDemoSimulation)
+        );
+        const payment = await paymentService().listPayments(
+          result.payment.booking_id,
+          req.user!.id,
+          Boolean(req.user!.is_admin)
+        );
+        res.status(200).json({
+          success: true,
+          message: 'Payment verified and captured successfully. Booking is now confirmed!',
+          data: {
+            payment: payment.find((item) => item.id === result.payment.id) || result.payment,
+            bookingStatus: result.bookingStatus,
+          },
+        });
+      } catch (error) {
+        if (error instanceof PaymentServiceError) {
+          res.status(error.status).json({ success: false, error: error.message });
+          return;
+        }
+        next(error);
+      }
+      return;
+    }
     const payment = store.getPaymentByOrderId(razorpay_order_id);
     if (!payment) {
       res.status(404).json({
@@ -139,20 +219,7 @@ export class PaymentController {
       return;
     }
 
-    // Idempotency check: If payment was already captured, return success immediately
-    if (payment.status === 'captured') {
-      res.status(200).json({
-        success: true,
-        message: 'Payment was already verified and captured (idempotent response).',
-        data: {
-          payment,
-          bookingStatus: booking.status,
-        },
-      });
-      return;
-    }
-
-    // Cryptographic signature verification
+    // Cryptographic signature verification (never skipped for already-captured rows)
     const isValid = PaymentController.verifyRazorpaySignature(
       razorpay_order_id,
       razorpay_payment_id,
@@ -160,26 +227,39 @@ export class PaymentController {
       config.razorpayKeySecret
     );
 
-    // If signature check fails and not explicit test simulation token
-    if (!isValid && !is_demo_simulated) {
-      payment.status = 'failed';
-      payment.error_code = 'BAD_SIGNATURE';
-      payment.error_description = 'Cryptographic signature verification failed.';
-      store.updatePayment(payment);
-
-      const equipment = store.getEquipmentById(booking.equipment_id);
-      NotificationService.notifyPaymentFailed(
-        booking.id,
-        equipment?.title || 'Farm Equipment',
-        payment.user_id,
-        'Signature mismatch'
-      );
-
+    // Demo simulation is checkout-verify only and never authenticates webhooks.
+    // Invalid checkout signatures must not poison payment/booking state.
+    if (!isValid && !isDemoSimulationAllowed(Boolean(is_demo_simulated), config.paymentAllowDemoSimulation)) {
       res.status(400).json({
         success: false,
         error: 'Payment verification failed: invalid signature.',
       });
       return;
+    }
+
+    try {
+      const captureDecision = evaluatePaymentCapture(
+        payment.status,
+        payment.razorpay_payment_id,
+        razorpay_payment_id
+      );
+      if (captureDecision === 'idempotent') {
+        res.status(200).json({
+          success: true,
+          message: 'Payment was already verified and captured (idempotent response).',
+          data: {
+            payment,
+            bookingStatus: booking.status,
+          },
+        });
+        return;
+      }
+    } catch (error) {
+      if (error instanceof PaymentServiceError) {
+        res.status(error.status).json({ success: false, error: error.message });
+        return;
+      }
+      throw error;
     }
 
     // Update payment record
@@ -216,22 +296,22 @@ export class PaymentController {
    * POST /api/payments/webhook
    * Handle Razorpay Webhook with raw body signature verification
    */
-  public static handleWebhook(req: AuthenticatedRequest, res: Response): void {
-    const signature = req.headers['x-razorpay-signature'] as string;
-    const rawBody = req.rawBody || JSON.stringify(req.body);
+  public static async handleWebhook(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+    const signature = req.headers['x-razorpay-signature'];
+    const rawBody = req.rawBody;
 
-    if (!signature) {
+    if (!signature || typeof signature !== 'string') {
       res.status(400).json({ success: false, error: 'Missing x-razorpay-signature header' });
       return;
     }
 
-    // Verify webhook signature
-    const expectedSignature = crypto
-      .createHmac('sha256', config.razorpayWebhookSecret)
-      .update(rawBody)
-      .digest('hex');
+    if (typeof rawBody !== 'string') {
+      res.status(400).json({ success: false, error: 'Missing raw webhook body for signature verification' });
+      return;
+    }
 
-    if (expectedSignature !== signature && process.env.NODE_ENV === 'production') {
+    // Always verify HMAC against the raw body. Demo payment simulation must not bypass this.
+    if (!verifyWebhookSignature(rawBody, signature, config.razorpayWebhookSecret)) {
       res.status(400).json({ success: false, error: 'Invalid webhook signature' });
       return;
     }
@@ -248,32 +328,75 @@ export class PaymentController {
     const orderId = paymentEntity.order_id;
     const paymentId = paymentEntity.id;
 
-    if (orderId) {
+    if (orderId && usePostgres()) {
+      try {
+        await paymentService().processWebhook(
+          orderId,
+          paymentId,
+          eventType,
+          paymentEntity.error_code,
+          paymentEntity.error_description
+        );
+      } catch (error) {
+        if (error instanceof PaymentServiceError) {
+          res.status(error.status).json({ success: false, error: error.message });
+          return;
+        }
+        next(error);
+        return;
+      }
+    } else if (orderId) {
       const payment = store.getPaymentByOrderId(orderId);
       if (payment) {
-        // Idempotency check
-        if (eventType === 'payment.captured' && payment.status !== 'captured') {
-          payment.status = 'captured';
-          payment.razorpay_payment_id = paymentId;
-          store.updatePayment(payment);
-          store.updateBookingStatus(payment.booking_id, 'confirmed');
-
-          const booking = store.getBookingById(payment.booking_id);
-          const equipment = booking ? store.getEquipmentById(booking.equipment_id) : undefined;
-          if (booking && equipment) {
-            NotificationService.notifyPaymentSuccess(
-              booking.id,
-              equipment.title,
-              payment.amount,
-              booking.renter_id,
-              equipment.owner_id
+        if (eventType === 'payment.captured') {
+          try {
+            const captureDecision = evaluatePaymentCapture(
+              payment.status,
+              payment.razorpay_payment_id,
+              paymentId
             );
+            if (captureDecision === 'apply') {
+              payment.status = 'captured';
+              payment.razorpay_payment_id = paymentId;
+              store.updatePayment(payment);
+              store.updateBookingStatus(payment.booking_id, 'confirmed');
+
+              const booking = store.getBookingById(payment.booking_id);
+              const equipment = booking ? store.getEquipmentById(booking.equipment_id) : undefined;
+              if (booking && equipment) {
+                NotificationService.notifyPaymentSuccess(
+                  booking.id,
+                  equipment.title,
+                  payment.amount,
+                  booking.renter_id,
+                  equipment.owner_id
+                );
+              }
+            }
+          } catch (error) {
+            if (error instanceof PaymentServiceError) {
+              res.status(error.status).json({ success: false, error: error.message });
+              return;
+            }
+            throw error;
           }
-        } else if (eventType === 'payment.failed' && payment.status !== 'captured') {
-          payment.status = 'failed';
-          payment.error_code = paymentEntity.error_code || 'PAYMENT_FAILED';
-          payment.error_description = paymentEntity.error_description || 'Webhook reported payment failure';
-          store.updatePayment(payment);
+        } else if (eventType === 'payment.failed' && payment.status !== 'captured' && payment.status !== 'refunded') {
+          if (payment.status !== 'failed') {
+            payment.status = 'failed';
+            payment.error_code = paymentEntity.error_code || 'PAYMENT_FAILED';
+            payment.error_description = paymentEntity.error_description || 'Webhook reported payment failure';
+            store.updatePayment(payment);
+            const booking = store.getBookingById(payment.booking_id);
+            const equipment = booking ? store.getEquipmentById(booking.equipment_id) : undefined;
+            if (booking) {
+              NotificationService.notifyPaymentFailed(
+                booking.id,
+                equipment?.title || 'Farm Equipment',
+                booking.renter_id,
+                payment.error_description
+              );
+            }
+          }
         }
       }
     }
@@ -285,7 +408,24 @@ export class PaymentController {
    * Helper endpoint: GET /api/payments/booking/:bookingId
    * Retrieve payment history for a specific booking
    */
-  public static getBookingPayments(req: AuthenticatedRequest, res: Response): void {
+  public static async getBookingPayments(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+    if (usePostgres()) {
+      try {
+        const payments = await paymentService().listPayments(
+          req.params.bookingId,
+          req.user!.id,
+          Boolean(req.user!.is_admin)
+        );
+        res.status(200).json({ success: true, data: { payments } });
+      } catch (error) {
+        if (error instanceof PaymentServiceError) {
+          res.status(error.status).json({ success: false, error: error.message });
+          return;
+        }
+        next(error);
+      }
+      return;
+    }
     const { bookingId } = req.params;
     const booking = store.getBookingById(bookingId);
     if (!booking) {

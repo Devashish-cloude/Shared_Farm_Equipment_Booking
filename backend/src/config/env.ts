@@ -22,5 +22,11 @@ export const config = {
   razorpayKeyId: process.env.RAZORPAY_KEY_ID || 'rzp_test_placeholder_key_id',
   razorpayKeySecret: process.env.RAZORPAY_KEY_SECRET || 'rzp_test_placeholder_secret',
   razorpayWebhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET || 'rzp_webhook_placeholder_secret',
+  paymentAllowDemoSimulation:
+    process.env.PAYMENT_ALLOW_DEMO_SIMULATION === 'true' &&
+    (process.env.NODE_ENV || 'development') !== 'production',
+  demoAuthAllowHeader:
+    process.env.DEMO_AUTH_ALLOW_HEADER === 'true' &&
+    (process.env.NODE_ENV || 'development') !== 'production',
   trackingStaleThresholdMinutes: parseInt(process.env.TRACKING_STALE_THRESHOLD_MINUTES || '5', 10),
 };

@@ -1,11 +1,25 @@
-import { Response } from 'express';
+import { NextFunction, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { store } from '../services/store.js';
 import { NotificationService } from '../services/notificationService.js';
+import { config } from '../config/env.js';
+import { BookingService, BookingServiceError } from '../services/bookingService.js';
 import { AuthenticatedRequest, Booking, BookingStatus } from '../types/index.js';
 
+function usePostgres(): boolean {
+  return Boolean(config.databaseUrl);
+}
+
+function createBookingService(): BookingService {
+  return new BookingService();
+}
+
 export class BookingController {
-  public static createBooking(req: AuthenticatedRequest, res: Response): void {
+  public static async createBooking(
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
     const { equipment_id, start_date, end_date, total_hours, notes } = req.body;
 
     if (!equipment_id || !start_date || !end_date || !total_hours) {
@@ -13,6 +27,30 @@ export class BookingController {
         success: false,
         error: 'equipment_id, start_date, end_date, and total_hours are required.',
       });
+      return;
+    }
+
+    if (usePostgres()) {
+      try {
+        const result = await createBookingService().createPending({
+          renterId: req.user!.id,
+          equipmentId: equipment_id,
+          startDate: start_date,
+          endDate: end_date,
+          notes,
+        });
+        res.status(201).json({
+          success: true,
+          message: 'Booking request submitted to owner.',
+          data: { booking: result.booking },
+        });
+      } catch (error) {
+        if (error instanceof BookingServiceError) {
+          res.status(error.status).json({ success: false, error: error.message });
+          return;
+        }
+        next(error);
+      }
       return;
     }
 
@@ -71,7 +109,33 @@ export class BookingController {
     });
   }
 
-  public static getMyRentals(req: AuthenticatedRequest, res: Response): void {
+  public static async getMyRentals(
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    if (usePostgres()) {
+      try {
+        const results = await createBookingService().getByUser(req.user!.id, 'renter');
+        res.status(200).json({
+          success: true,
+          data: {
+            bookings: results.map(({ booking, equipment }) => ({
+              ...booking,
+              equipment: {
+                id: equipment.id,
+                title: equipment.title,
+                location: equipment.location_name,
+                image: equipment.image_url,
+              },
+            })),
+          },
+        });
+      } catch (error) {
+        next(error);
+      }
+      return;
+    }
     const { myRentals } = store.listBookingsByUser(req.user!.id);
     const enriched = myRentals.map((b) => {
       const eq = store.getEquipmentById(b.equipment_id);
@@ -84,7 +148,33 @@ export class BookingController {
     res.status(200).json({ success: true, data: { bookings: enriched } });
   }
 
-  public static getMyEquipment(req: AuthenticatedRequest, res: Response): void {
+  public static async getMyEquipment(
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    if (usePostgres()) {
+      try {
+        const results = await createBookingService().getByUser(req.user!.id, 'owner');
+        res.status(200).json({
+          success: true,
+          data: {
+            bookings: results.map(({ booking, equipment, renter }) => ({
+              ...booking,
+              renter,
+              equipment: {
+                id: equipment.id,
+                title: equipment.title,
+                location: equipment.location_name,
+              },
+            })),
+          },
+        });
+      } catch (error) {
+        next(error);
+      }
+      return;
+    }
     const { myEquipment } = store.listBookingsByUser(req.user!.id);
     const enriched = myEquipment.map((b) => {
       const renter = store.getUserById(b.renter_id);
@@ -99,8 +189,41 @@ export class BookingController {
     res.status(200).json({ success: true, data: { bookings: enriched } });
   }
 
-  public static getBookingById(req: AuthenticatedRequest, res: Response): void {
+  public static async getBookingById(
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
     const { id } = req.params;
+    if (usePostgres()) {
+      try {
+        const result = await createBookingService().getById(id);
+        if (!result) {
+          res.status(404).json({ success: false, error: 'Booking not found.' });
+          return;
+        }
+        if (
+          req.user!.id !== result.booking.renter_id &&
+          result.equipment.owner_id !== req.user!.id &&
+          !req.user!.is_admin
+        ) {
+          res.status(403).json({ success: false, error: 'Forbidden: unauthorized booking access.' });
+          return;
+        }
+        res.status(200).json({
+          success: true,
+          data: {
+            booking: result.booking,
+            equipment: result.equipment,
+            renter: result.renter,
+            owner: result.owner,
+          },
+        });
+      } catch (error) {
+        next(error);
+      }
+      return;
+    }
     const booking = store.getBookingById(id);
     if (!booking) {
       res.status(404).json({ success: false, error: 'Booking not found.' });
@@ -132,9 +255,36 @@ export class BookingController {
     });
   }
 
-  public static updateBookingStatus(req: AuthenticatedRequest, res: Response): void {
+  public static async updateBookingStatus(
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
     const { id } = req.params;
     const { status } = req.body as { status: BookingStatus };
+
+    if (usePostgres()) {
+      try {
+        const result = await createBookingService().transition(
+          id,
+          status,
+          req.user!.id,
+          Boolean(req.user!.is_admin)
+        );
+        res.status(200).json({
+          success: true,
+          message: `Booking status transitioned to '${result.booking.status}'.`,
+          data: { booking: result.booking },
+        });
+      } catch (error) {
+        if (error instanceof BookingServiceError) {
+          res.status(error.status).json({ success: false, error: error.message });
+          return;
+        }
+        next(error);
+      }
+      return;
+    }
 
     const booking = store.getBookingById(id);
     if (!booking) {

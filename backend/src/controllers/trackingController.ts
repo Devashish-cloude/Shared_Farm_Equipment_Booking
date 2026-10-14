@@ -1,4 +1,4 @@
-import { Response } from 'express';
+import { NextFunction, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { store } from '../services/store.js';
 import { NotificationService } from '../services/notificationService.js';
@@ -11,6 +11,16 @@ import {
   Booking,
   Equipment,
 } from '../types/index.js';
+import { getDatabasePool } from '../db/pool.js';
+import { TrackingService, TrackingServiceError } from '../services/trackingService.js';
+
+function usePostgres(): boolean {
+  return Boolean(config.databaseUrl);
+}
+
+function trackingService(): TrackingService {
+  return new TrackingService(getDatabasePool());
+}
 
 type AuthorizedBookingResult =
   | { success: false; error: string; status: number }
@@ -63,9 +73,36 @@ export class TrackingController {
    * POST /api/rental-sessions/:bookingId/start
    * Start a rental session and activate tracking.
    */
-  public static startSession(req: AuthenticatedRequest, res: Response): void {
+  public static async startSession(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
     const { bookingId } = req.params;
     const { notes } = req.body;
+
+    if (usePostgres()) {
+      try {
+        const result = await trackingService().start(
+          bookingId,
+          req.user!.id,
+          Boolean(req.user!.is_admin),
+          notes
+        );
+        res.status(201).json({
+          success: true,
+          message: 'Rental session started successfully. Live tracking telemetry is now active.',
+          data: result,
+        });
+      } catch (error) {
+        if (error instanceof TrackingServiceError) {
+          res.status(error.status).json({
+            success: false,
+            error: error.message,
+            ...(error.status === 409 ? { data: undefined } : {}),
+          });
+          return;
+        }
+        next(error);
+      }
+      return;
+    }
 
     const authCheck = TrackingController.getAuthorizedBooking(req, bookingId);
     if (!authCheck.success) {
@@ -149,9 +186,32 @@ export class TrackingController {
    * POST /api/rental-sessions/:bookingId/end
    * End an active rental session and conclude tracking.
    */
-  public static endSession(req: AuthenticatedRequest, res: Response): void {
+  public static async endSession(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
     const { bookingId } = req.params;
     const { notes } = req.body;
+
+    if (usePostgres()) {
+      try {
+        const result = await trackingService().end(
+          bookingId,
+          req.user!.id,
+          Boolean(req.user!.is_admin),
+          notes
+        );
+        res.status(200).json({
+          success: true,
+          message: 'Rental session ended successfully. Location tracking has ceased.',
+          data: result,
+        });
+      } catch (error) {
+        if (error instanceof TrackingServiceError) {
+          res.status(error.status).json({ success: false, error: error.message });
+          return;
+        }
+        next(error);
+      }
+      return;
+    }
 
     const authCheck = TrackingController.getAuthorizedBooking(req, bookingId);
     if (!authCheck.success) {
@@ -203,7 +263,7 @@ export class TrackingController {
    * POST /api/tracking/location
    * Ingest GPS / simulated telemetry point for an active rental session.
    */
-  public static ingestLocation(req: AuthenticatedRequest, res: Response): void {
+  public static async ingestLocation(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
     const { bookingId, latitude, longitude, source, speed_kmh, heading_deg } = req.body;
 
     if (!bookingId || latitude === undefined || longitude === undefined) {
@@ -211,6 +271,29 @@ export class TrackingController {
         success: false,
         error: 'Missing required fields: bookingId, latitude, longitude are mandatory.',
       });
+      return;
+    }
+
+    if (usePostgres()) {
+      try {
+        const point = await trackingService().ingest(
+          bookingId,
+          req.user!.id,
+          Boolean(req.user!.is_admin),
+          { latitude, longitude, source, speed_kmh, heading_deg }
+        );
+        res.status(201).json({
+          success: true,
+          message: 'Telemetry point recorded successfully.',
+          data: { point },
+        });
+      } catch (error) {
+        if (error instanceof TrackingServiceError) {
+          res.status(error.status).json({ success: false, error: error.message });
+          return;
+        }
+        next(error);
+      }
       return;
     }
 
@@ -272,8 +355,47 @@ export class TrackingController {
    * GET /api/tracking/bookings/:bookingId/latest
    * Retrieve latest reported location for authorized participants.
    */
-  public static getLatestLocation(req: AuthenticatedRequest, res: Response): void {
+  public static async getLatestLocation(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
     const { bookingId } = req.params;
+
+    if (usePostgres()) {
+      try {
+        const result = await trackingService().latest(
+          bookingId,
+          req.user!.id,
+          Boolean(req.user!.is_admin)
+        );
+        const latestPoint = result.latestPoint;
+        const diffMs = latestPoint ? Date.now() - new Date(latestPoint.recorded_at).getTime() : 0;
+        const staleMinutes = latestPoint ? Math.floor(diffMs / 60000) : 0;
+        res.status(200).json({
+          success: true,
+          data: {
+            bookingId: result.context.booking.id,
+            equipment: {
+              id: result.context.equipment.id,
+              title: result.context.equipment.title,
+              locationName: result.context.equipment.location_name,
+            },
+            sessionStatus: result.activeSession
+              ? 'active'
+              : (result.context.booking.status === 'completed' ? 'completed' : 'inactive'),
+            activeSession: result.activeSession || null,
+            latestLocation: latestPoint || null,
+            isStale: staleMinutes >= config.trackingStaleThresholdMinutes,
+            staleMinutes,
+            trackingActive: Boolean(result.activeSession),
+          },
+        });
+      } catch (error) {
+        if (error instanceof TrackingServiceError) {
+          res.status(error.status).json({ success: false, error: error.message });
+          return;
+        }
+        next(error);
+      }
+      return;
+    }
 
     const authCheck = TrackingController.getAuthorizedBooking(req, bookingId);
     if (!authCheck.success) {
@@ -317,8 +439,35 @@ export class TrackingController {
    * GET /api/tracking/bookings/:bookingId/history
    * Retrieve full coordinate route history for authorized participants.
    */
-  public static getLocationHistory(req: AuthenticatedRequest, res: Response): void {
+  public static async getLocationHistory(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
     const { bookingId } = req.params;
+
+    if (usePostgres()) {
+      try {
+        const result = await trackingService().history(
+          bookingId,
+          req.user!.id,
+          Boolean(req.user!.is_admin)
+        );
+        res.status(200).json({
+          success: true,
+          data: {
+            bookingId: result.context.booking.id,
+            equipmentId: result.context.equipment.id,
+            totalPoints: result.history.length,
+            sessionStatus: result.activeSession ? 'active' : 'inactive',
+            history: result.history,
+          },
+        });
+      } catch (error) {
+        if (error instanceof TrackingServiceError) {
+          res.status(error.status).json({ success: false, error: error.message });
+          return;
+        }
+        next(error);
+      }
+      return;
+    }
 
     const authCheck = TrackingController.getAuthorizedBooking(req, bookingId);
     if (!authCheck.success) {

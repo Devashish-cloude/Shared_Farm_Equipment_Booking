@@ -1,8 +1,11 @@
-import path from 'node:path';
 import { config } from '../config/env.js';
 import { getDatabasePool, shutdownDatabasePool } from './pool.js';
 import { inspectExistingSchema } from './schemaInspection.js';
-import { loadMigrations, MigrationPool } from './migrate.js';
+import {
+  DEFAULT_MIGRATION_DIRECTORY,
+  loadMigrations,
+  MigrationPool,
+} from './migrate.js';
 
 interface AdoptionClient {
   query<T = Record<string, unknown>>(
@@ -94,7 +97,7 @@ async function adoptExisting(
 
 export async function adoptExistingDatabase(
   confirmed: boolean,
-  migrationDir = path.resolve(process.cwd(), 'database', 'migrations')
+  migrationDir = DEFAULT_MIGRATION_DIRECTORY
 ): Promise<void> {
   const pool = getDatabasePool();
   try {

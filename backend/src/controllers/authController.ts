@@ -1,13 +1,41 @@
-import { Request, Response } from 'express';
+import { NextFunction, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
 import { store } from '../services/store.js';
 import { config } from '../config/env.js';
 import { AuthenticatedRequest, User, UserProfile } from '../types/index.js';
+import { classifyDatabaseError } from '../db/errors.js';
+import { getDatabasePool } from '../db/pool.js';
+import { UserRepository } from '../repositories/userRepository.js';
+
+function usePostgres(): boolean {
+  return Boolean(config.databaseUrl);
+}
+
+function createUserRepository(): UserRepository {
+  return new UserRepository(getDatabasePool());
+}
+
+function createToken(user: User): string {
+  return jwt.sign(
+    {
+      id: user.id,
+      email: user.email,
+      full_name: user.full_name,
+      is_admin: user.is_admin,
+    },
+    config.jwtSecret,
+    { expiresIn: '7d' }
+  );
+}
 
 export class AuthController {
-  public static login(req: Request, res: Response): void {
+  public static async login(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
     const { email, password } = req.body;
 
     if (!email || !password) {
@@ -15,28 +43,27 @@ export class AuthController {
       return;
     }
 
-    const user = store.getUserByEmail(email);
+    let user: User | undefined;
+    try {
+      user = usePostgres()
+        ? await createUserRepository().findByEmail(email)
+        : store.getUserByEmail(email);
+    } catch (error) {
+      next(error);
+      return;
+    }
     if (!user) {
       res.status(401).json({ success: false, error: 'Invalid email or password.' });
       return;
     }
 
-    const isMatch = bcrypt.compareSync(password, user.password_hash);
+    const isMatch = await bcrypt.compare(password, user.password_hash);
     if (!isMatch) {
       res.status(401).json({ success: false, error: 'Invalid email or password.' });
       return;
     }
 
-    const token = jwt.sign(
-      {
-        id: user.id,
-        email: user.email,
-        full_name: user.full_name,
-        is_admin: user.is_admin,
-      },
-      config.jwtSecret,
-      { expiresIn: '7d' }
-    );
+    const token = createToken(user);
 
     res.status(200).json({
       success: true,
@@ -54,7 +81,11 @@ export class AuthController {
     });
   }
 
-  public static register(req: Request, res: Response): void {
+  public static async register(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
     const { email, password, full_name, phone, location_name } = req.body;
 
     if (!email || !password || !full_name) {
@@ -62,7 +93,7 @@ export class AuthController {
       return;
     }
 
-    if (store.getUserByEmail(email)) {
+    if (!usePostgres() && store.getUserByEmail(email)) {
       res.status(409).json({ success: false, error: 'User with this email already exists.' });
       return;
     }
@@ -82,8 +113,6 @@ export class AuthController {
       updated_at: now,
     };
 
-    store.createUser(newUser);
-
     const newProfile: UserProfile = {
       id: `prof_${uuidv4().substring(0, 8)}`,
       user_id: userId,
@@ -92,18 +121,23 @@ export class AuthController {
       created_at: now,
       updated_at: now,
     };
-    store.userProfiles.set(userId, newProfile);
+    try {
+      if (usePostgres()) {
+        await createUserRepository().createUserWithProfile(newUser, newProfile);
+      } else {
+        store.createUser(newUser);
+        store.userProfiles.set(userId, newProfile);
+      }
+    } catch (error) {
+      if (classifyDatabaseError(error) === 'unique_violation') {
+        res.status(409).json({ success: false, error: 'User with this email already exists.' });
+        return;
+      }
+      next(error);
+      return;
+    }
 
-    const token = jwt.sign(
-      {
-        id: newUser.id,
-        email: newUser.email,
-        full_name: newUser.full_name,
-        is_admin: newUser.is_admin,
-      },
-      config.jwtSecret,
-      { expiresIn: '7d' }
-    );
+    const token = createToken(newUser);
 
     res.status(201).json({
       success: true,
@@ -121,14 +155,31 @@ export class AuthController {
     });
   }
 
-  public static getMe(req: AuthenticatedRequest, res: Response): void {
-    const user = store.getUserById(req.user!.id);
+  public static async getMe(
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    const repository = usePostgres() ? createUserRepository() : undefined;
+    let user: User | undefined;
+    let profile: UserProfile | undefined;
+    try {
+      user = repository
+        ? await repository.findById(req.user!.id)
+        : store.getUserById(req.user!.id);
+      if (user) {
+        profile = repository
+          ? await repository.findProfileByUserId(user.id)
+          : store.userProfiles.get(user.id);
+      }
+    } catch (error) {
+      next(error);
+      return;
+    }
     if (!user) {
       res.status(404).json({ success: false, error: 'User not found.' });
       return;
     }
-
-    const profile = store.userProfiles.get(user.id);
 
     res.status(200).json({
       success: true,

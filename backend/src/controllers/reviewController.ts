@@ -1,14 +1,20 @@
-import { Response } from 'express';
+import { NextFunction, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { store } from '../services/store.js';
 import { AuthenticatedRequest, Review, ReviewType } from '../types/index.js';
+import { config } from '../config/env.js';
+import { getDatabasePool } from '../db/pool.js';
+import { ReviewService, ReviewServiceError } from '../services/reviewService.js';
+import { EquipmentRepository } from '../repositories/equipmentRepository.js';
+
+function usePostgres(): boolean { return Boolean(config.databaseUrl); }
 
 export class ReviewController {
   /**
    * POST /api/reviews
    * Submit a review for a completed rental booking.
    */
-  public static createReview(req: AuthenticatedRequest, res: Response): void {
+  public static async createReview(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
     const { bookingId, rating, comment } = req.body;
     const currentUserId = req.user!.id;
 
@@ -35,6 +41,29 @@ export class ReviewController {
         success: false,
         error: 'Review comment must be at least 5 characters long.',
       });
+      return;
+    }
+
+    if (usePostgres()) {
+      try {
+        const result = await new ReviewService(getDatabasePool()).create(
+          bookingId, currentUserId, Boolean(req.user?.is_admin), numRating, trimmedComment
+        );
+        res.status(201).json({
+          success: true,
+          message: 'Review submitted successfully. Thank you for your feedback!',
+          data: {
+            review: result.review,
+            equipmentAggregate: { ratingAvg: result.aggregate.avg, ratingCount: result.aggregate.count },
+          },
+        });
+      } catch (error) {
+        if (error instanceof ReviewServiceError) {
+          res.status(error.status).json({ success: false, error: error.message });
+          return;
+        }
+        next(error);
+      }
       return;
     }
 
@@ -122,8 +151,32 @@ export class ReviewController {
    * GET /api/equipment/:equipmentId/reviews
    * Fetch all reviews and aggregate ratings for an equipment listing.
    */
-  public static getEquipmentReviews(req: AuthenticatedRequest, res: Response): void {
+  public static async getEquipmentReviews(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
     const { equipmentId } = req.params;
+
+    if (usePostgres()) {
+      try {
+        const equipment = await new EquipmentRepository(getDatabasePool()).findById(equipmentId);
+        if (!equipment) {
+          res.status(404).json({ success: false, error: 'Equipment not found.' });
+          return;
+        }
+        const result = await new ReviewService(getDatabasePool()).list(equipmentId);
+        res.status(200).json({
+          success: true,
+          data: {
+            equipmentId,
+            equipmentTitle: equipment.equipment.title,
+            ratingAvg: result.aggregate.avg || equipment.equipment.rating_avg,
+            ratingCount: result.aggregate.count || equipment.equipment.rating_count,
+            reviews: result.reviews,
+          },
+        });
+      } catch (error) {
+        next(error);
+      }
+      return;
+    }
 
     const equipment = store.getEquipmentById(equipmentId);
     if (!equipment) {
