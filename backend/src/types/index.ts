@@ -46,6 +46,28 @@ export interface Equipment {
   updated_at: string;
 }
 
+export interface EquipmentCategory {
+  id: string;
+  name: string;
+  description?: string;
+}
+
+export interface EquipmentAvailabilityWindow {
+  id: string;
+  equipment_id: string;
+  start_date: string;
+  end_date: string;
+  created_at: string;
+}
+
+export interface EquipmentBlockedPeriod {
+  id: string;
+  equipment_id: string;
+  start_date: string;
+  end_date: string;
+  created_at: string;
+}
+
 export type BookingStatus =
   | 'pending'
   | 'accepted'

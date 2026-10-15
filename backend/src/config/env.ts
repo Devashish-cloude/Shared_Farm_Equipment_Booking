@@ -5,9 +5,20 @@ import path from 'path';
 dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 dotenv.config();
 
+export const DEFAULT_JWT_SECRET = 'shared_farm_jwt_super_secret_key_2026';
+
+export function validateJwtSecret(nodeEnv: string, secret: string | undefined): string {
+  if (nodeEnv === 'production' && (!secret || secret === DEFAULT_JWT_SECRET)) {
+    throw new Error('JWT_SECRET must be explicitly configured in production.');
+  }
+  return secret || DEFAULT_JWT_SECRET;
+}
+
+const nodeEnv = process.env.NODE_ENV || 'development';
+
 export const config = {
   port: parseInt(process.env.PORT || '5001', 10),
-  nodeEnv: process.env.NODE_ENV || 'development',
+  nodeEnv,
   databaseUrl: process.env.DATABASE_URL,
   databasePoolMax: parseInt(process.env.DB_POOL_MAX || '10', 10),
   databaseIdleTimeoutMs: parseInt(process.env.DB_IDLE_TIMEOUT_MS || '10000', 10),
@@ -17,7 +28,7 @@ export const config = {
     process.env.NODE_ENV === 'production' ||
     process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false',
   databaseMigrationLockKey: process.env.DB_MIGRATION_LOCK_KEY || 'shared-farm-schema-migrations',
-  jwtSecret: process.env.JWT_SECRET || 'shared_farm_jwt_super_secret_key_2026',
+  jwtSecret: validateJwtSecret(nodeEnv, process.env.JWT_SECRET),
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
   razorpayKeyId: process.env.RAZORPAY_KEY_ID || 'rzp_test_placeholder_key_id',
   razorpayKeySecret: process.env.RAZORPAY_KEY_SECRET || 'rzp_test_placeholder_secret',

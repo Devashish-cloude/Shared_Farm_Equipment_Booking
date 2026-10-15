@@ -66,7 +66,8 @@ describe('EquipmentRepository', () => {
       }),
       owner: { id: 'user_1', fullName: 'Rahul Sharma' },
     }]);
-    expect(database.calls[0].text).toContain("WHERE e.status = 'active'");
+    expect(database.calls[0].text).toContain('WHERE e.status = $1');
+    expect(database.calls[0].values).toEqual(['active']);
   });
 
   it('uses parameterized lookup and maps categories', async () => {
@@ -106,5 +107,39 @@ describe('EquipmentRepository', () => {
     expect(database.calls[0].text).toContain('INSERT INTO equipment');
     expect(database.calls[0].text).toContain('$2');
     expect(database.calls[0].values).toContain('user_1');
+  });
+
+  it('builds parameterized marketplace filters and update/deactivation queries', async () => {
+    const database = new FakeDatabase();
+    database.rows = [row];
+    const repository = new EquipmentRepository(database.asPool());
+
+    await repository.findAvailable(database, {
+      categoryId: 'cat_1',
+      location: 'Nashik',
+      minPrice: 500,
+      maxPrice: 1000,
+      startDate: '2031-01-01T10:00:00.000Z',
+      endDate: '2031-01-01T12:00:00.000Z',
+    });
+    expect(database.calls[0].text).toContain('e.category_id =');
+    expect(database.calls[0].text).toContain('e.location_name ILIKE');
+    expect(database.calls[0].text).toContain('equipment_availability_windows');
+    expect(database.calls[0].values).toEqual([
+      'active',
+      'cat_1',
+      '%Nashik%',
+      500,
+      1000,
+      '2031-01-01T10:00:00.000Z',
+      '2031-01-01T12:00:00.000Z',
+    ]);
+
+    await repository.update('eq_1', { title: 'Updated', hourly_rate: 950 });
+    expect(database.calls[1].text).toContain('UPDATE equipment');
+    expect(database.calls[1].text.split('RETURNING')[0]).not.toContain('owner_id');
+
+    await repository.deactivate('eq_1');
+    expect(database.calls[2].text).toContain("status = 'inactive'");
   });
 });

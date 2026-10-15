@@ -69,9 +69,12 @@ export const createApp = () => {
   // Global Error Handler
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     console.error('[API Error]:', err);
-    res.status(err.status || 500).json({
+    const status = Number.isInteger(err?.status) && err.status >= 400 && err.status < 500
+      ? err.status
+      : 500;
+    res.status(status).json({
       success: false,
-      error: err.message || 'Internal server error',
+      error: status === 500 ? 'Internal server error' : err.message,
     });
   });
 

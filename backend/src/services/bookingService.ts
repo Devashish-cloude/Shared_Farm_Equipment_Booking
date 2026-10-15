@@ -5,6 +5,7 @@ import {
   BookingContext,
   BookingRepository,
 } from '../repositories/bookingRepository.js';
+import { AvailabilityRepository } from '../repositories/availabilityRepository.js';
 import { Booking, BookingStatus } from '../types/index.js';
 
 const TRANSITIONS: Record<BookingStatus, BookingStatus[]> = {
@@ -38,7 +39,7 @@ export type CreateBookingInput = {
   notes?: string;
 };
 
-function parsePeriod(startDate: string, endDate: string): {
+export function parseBookingPeriod(startDate: string, endDate: string): {
   start: string;
   end: string;
   hours: number;
@@ -59,8 +60,14 @@ function roundCents(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
-function assertTransition(from: BookingStatus, to: BookingStatus): void {
-  if (!TRANSITIONS[from].includes(to)) {
+export const PUBLIC_BOOKING_STATUSES: readonly BookingStatus[] = [
+  'accepted',
+  'rejected',
+  'cancelled',
+];
+
+export function assertBookingTransition(from: BookingStatus, to: BookingStatus): void {
+  if (!PUBLIC_BOOKING_STATUSES.includes(to) || !TRANSITIONS[from]?.includes(to)) {
     throw new BookingServiceError(
       `Booking cannot transition from '${from}' to '${to}'.`,
       400
@@ -87,14 +94,16 @@ function notify(
 export class BookingService {
   private readonly pool: DatabasePool;
   private readonly repository: BookingRepository;
+  private readonly availabilityRepository: AvailabilityRepository;
 
   public constructor(pool: DatabasePool = getDatabasePool()) {
     this.pool = pool;
     this.repository = new BookingRepository(pool);
+    this.availabilityRepository = new AvailabilityRepository(pool);
   }
 
   public async createPending(input: CreateBookingInput): Promise<BookingContext> {
-    const period = parsePeriod(input.startDate, input.endDate);
+    const period = parseBookingPeriod(input.startDate, input.endDate);
     return withTransaction(
       this.pool as TransactionPool,
       async (client) => {
@@ -201,7 +210,7 @@ export class BookingService {
             403
           );
         }
-        assertTransition(initial.booking.status, requestedStatus);
+        assertBookingTransition(initial.booking.status, requestedStatus);
 
         if (requestedStatus === 'accepted') {
           const equipment = await this.repository.findEquipmentForUpdate(
@@ -210,6 +219,19 @@ export class BookingService {
           );
           if (!equipment || equipment.status !== 'active') {
             throw new BookingServiceError('Equipment is not available for booking.', 409);
+          }
+          if (
+            !(await this.availabilityRepository.isBookable(
+              initial.booking.equipment_id,
+              initial.booking.start_date,
+              initial.booking.end_date,
+              client
+            ))
+          ) {
+            throw new BookingServiceError(
+              'The booking is outside the equipment availability or falls in a blocked period.',
+              409
+            );
           }
           if (
             await this.repository.hasReservedOverlap(

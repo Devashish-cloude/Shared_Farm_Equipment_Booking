@@ -6,21 +6,33 @@ import {
   Booking,
   RentalSession,
   EquipmentTracking,
+  EquipmentAvailabilityWindow,
+  EquipmentBlockedPeriod,
   Payment,
   Notification,
   Review,
+  EquipmentCategory,
 } from '../types/index.js';
 
 class InMemoryStore {
   public users: Map<string, User> = new Map();
   public userProfiles: Map<string, UserProfile> = new Map();
   public equipment: Map<string, Equipment> = new Map();
+  public availabilityWindows: Map<string, EquipmentAvailabilityWindow> = new Map();
+  public blockedPeriods: Map<string, EquipmentBlockedPeriod> = new Map();
   public bookings: Map<string, Booking> = new Map();
   public rentalSessions: Map<string, RentalSession> = new Map();
   public trackingPoints: EquipmentTracking[] = [];
   public payments: Map<string, Payment> = new Map();
   public notifications: Map<string, Notification> = new Map();
   public reviews: Map<string, Review> = new Map();
+  public categories: EquipmentCategory[] = [
+    { id: 'cat_tractor', name: 'Tractors', description: 'Tractors and tractor-mounted equipment.' },
+    { id: 'cat_harvester', name: 'Harvesters', description: 'Harvesters and harvesting machinery.' },
+    { id: 'cat_tillage', name: 'Tillage', description: 'Rotavators, cultivators, ploughs and similar tools.' },
+    { id: 'cat_seeding', name: 'Seeding', description: 'Seed drills and planting equipment.' },
+    { id: 'cat_sprayer', name: 'Sprayers', description: 'Crop spraying equipment.' },
+  ];
 
   constructor() {
     this.seed();
@@ -31,6 +43,8 @@ class InMemoryStore {
     this.userProfiles.clear();
     this.equipment.clear();
     this.bookings.clear();
+    this.availabilityWindows.clear();
+    this.blockedPeriods.clear();
     this.rentalSessions.clear();
     this.trackingPoints = [];
     this.payments.clear();
@@ -105,6 +119,7 @@ class InMemoryStore {
     const tractor: Equipment = {
       id: 'eq_tractor_rahul',
       owner_id: 'user_rahul',
+      category_id: 'cat_tractor',
       title: 'Mahindra 575 DI (45 HP Tractor)',
       description: 'Reliable 45 HP Mahindra tractor with modern fuel efficiency. Perfect for tilling and haulage. Operator available.',
       hourly_rate: 900.0,
@@ -122,6 +137,7 @@ class InMemoryStore {
     const rotavator: Equipment = {
       id: 'eq_rotavator_amit',
       owner_id: 'user_amit',
+      category_id: 'cat_tillage',
       title: 'Shaktiman 7ft Rotavator',
       description: 'Heavy duty multi-speed rotavator, well-maintained blades for smooth seedbed preparation.',
       hourly_rate: 450.0,
@@ -239,6 +255,22 @@ class InMemoryStore {
 
   public getAllEquipment(): Equipment[] {
     return Array.from(this.equipment.values());
+  }
+
+  public getCategories(): EquipmentCategory[] {
+    return this.categories.map((category) => ({ ...category }));
+  }
+
+  public listAvailability(equipmentId: string): EquipmentAvailabilityWindow[] {
+    return Array.from(this.availabilityWindows.values())
+      .filter((window) => window.equipment_id === equipmentId)
+      .sort((left, right) => left.start_date.localeCompare(right.start_date));
+  }
+
+  public listBlockedPeriods(equipmentId: string): EquipmentBlockedPeriod[] {
+    return Array.from(this.blockedPeriods.values())
+      .filter((period) => period.equipment_id === equipmentId)
+      .sort((left, right) => left.start_date.localeCompare(right.start_date));
   }
 
   public updateEquipmentRating(id: string, avgRating: number, count: number): void {

@@ -1,6 +1,6 @@
 import { QueryResultRow } from 'pg';
 import { DatabasePool, getDatabasePool } from '../db/pool.js';
-import { Equipment } from '../types/index.js';
+import { Equipment, EquipmentCategory } from '../types/index.js';
 
 type EquipmentRow = {
   id: string;
@@ -22,10 +22,32 @@ type EquipmentRow = {
   owner_full_name: string | null;
 };
 
-export type EquipmentCategory = {
-  id: string;
-  name: string;
-  description?: string;
+export type EquipmentSearchFilters = {
+  categoryId?: string;
+  location?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  status?: Equipment['status'];
+  startDate?: string;
+  endDate?: string;
+};
+
+export type EquipmentUpdate = Partial<Pick<
+  Equipment,
+  'category_id' | 'title' | 'description' | 'hourly_rate' | 'daily_rate' |
+  'location_name' | 'approx_lat' | 'approx_lng' | 'image_url'
+>>;
+
+const equipmentUpdateColumns: Record<string, string> = {
+  category_id: 'category_id',
+  title: 'title',
+  description: 'description',
+  hourly_rate: 'hourly_rate',
+  daily_rate: 'daily_rate',
+  location_name: 'location_name',
+  approx_lat: 'approx_lat',
+  approx_lng: 'approx_lng',
+  image_url: 'image_url',
 };
 
 export interface EquipmentQueryClient {
@@ -80,12 +102,58 @@ export class EquipmentRepository {
   }
 
   public async findAvailable(
-    client: EquipmentQueryClient = this.pool
+    client: EquipmentQueryClient = this.pool,
+    filters: EquipmentSearchFilters = {}
   ): Promise<Array<{ equipment: Equipment; owner: { id: string; fullName: string } }>> {
+    const values: unknown[] = [];
+    const conditions: string[] = [
+      `e.status = $${values.length + 1}`,
+    ];
+    values.push(filters.status || 'active');
+    if (filters.categoryId) {
+      values.push(filters.categoryId);
+      conditions.push(`e.category_id = $${values.length}`);
+    }
+    if (filters.location) {
+      values.push(`%${filters.location}%`);
+      conditions.push(`e.location_name ILIKE $${values.length}`);
+    }
+    if (filters.minPrice !== undefined) {
+      values.push(filters.minPrice);
+      conditions.push(`e.hourly_rate >= $${values.length}`);
+    }
+    if (filters.maxPrice !== undefined) {
+      values.push(filters.maxPrice);
+      conditions.push(`e.hourly_rate <= $${values.length}`);
+    }
+    if (filters.startDate && filters.endDate) {
+      values.push(filters.startDate, filters.endDate);
+      const startParam = values.length - 1;
+      const endParam = values.length;
+      conditions.push(`(
+        NOT EXISTS (
+          SELECT 1 FROM equipment_availability_windows aw0
+          WHERE aw0.equipment_id = e.id
+        )
+        OR EXISTS (
+          SELECT 1 FROM equipment_availability_windows aw
+          WHERE aw.equipment_id = e.id
+            AND aw.start_date <= $${startParam}::timestamptz
+            AND aw.end_date >= $${endParam}::timestamptz
+        )
+      )`);
+      conditions.push(`NOT EXISTS (
+        SELECT 1 FROM equipment_blocked_periods bp
+        WHERE bp.equipment_id = e.id
+          AND bp.start_date < $${endParam}::timestamptz
+          AND bp.end_date > $${startParam}::timestamptz
+      )`);
+    }
     const result = await client.query<EquipmentRow>(
       `${equipmentSelect}
-       WHERE e.status = 'active'
-       ORDER BY e.created_at DESC`
+       WHERE ${conditions.join('\n         AND ')}
+       ORDER BY e.created_at DESC`,
+      values
     );
     return result.rows.map((row) => ({
       equipment: toEquipment(row),
@@ -159,5 +227,69 @@ export class EquipmentRepository {
       name: row.name,
       description: row.description ?? undefined,
     }));
+  }
+
+  public async categoryExists(
+    categoryId: string,
+    client: EquipmentQueryClient = this.pool
+  ): Promise<boolean> {
+    const result = await client.query<{ id: string }>(
+      'SELECT id FROM equipment_categories WHERE id = $1',
+      [categoryId]
+    );
+    return result.rows.length === 1;
+  }
+
+  public async update(
+    id: string,
+    fields: EquipmentUpdate,
+    client: EquipmentQueryClient = this.pool
+  ): Promise<Equipment | undefined> {
+    const entries = Object.entries(fields).filter(([, value]) => value !== undefined);
+    for (const [key] of entries) {
+      if (!equipmentUpdateColumns[key]) {
+        throw new Error(`Unsupported equipment update field: ${key}`);
+      }
+    }
+    if (entries.length === 0) {
+      return this.findById(id, client).then((result) => result?.equipment);
+    }
+    const values: unknown[] = [id];
+    const assignments = entries.map(([key, value]) => {
+      values.push(equipmentUpdateColumns[key] === 'category_id' ? value ?? null : value);
+      return `${equipmentUpdateColumns[key]} = $${values.length}`;
+    });
+    values.push(new Date().toISOString());
+    assignments.push(`updated_at = $${values.length}`);
+    const result = await client.query<EquipmentRow>(
+      `UPDATE equipment
+       SET ${assignments.join(', ')}
+       WHERE id = $1
+       RETURNING id, owner_id, category_id, title, description, hourly_rate, daily_rate,
+                 location_name, approx_lat, approx_lng, status, rating_avg, rating_count,
+                 image_url, created_at, updated_at`,
+      values
+    );
+    return result.rows[0]
+      ? toEquipment({ ...result.rows[0], owner_full_name: null })
+      : undefined;
+  }
+
+  public async deactivate(
+    id: string,
+    client: EquipmentQueryClient = this.pool
+  ): Promise<Equipment | undefined> {
+    const result = await client.query<EquipmentRow>(
+      `UPDATE equipment
+       SET status = 'inactive', updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1
+       RETURNING id, owner_id, category_id, title, description, hourly_rate, daily_rate,
+                 location_name, approx_lat, approx_lng, status, rating_avg, rating_count,
+                 image_url, created_at, updated_at`,
+      [id]
+    );
+    return result.rows[0]
+      ? toEquipment({ ...result.rows[0], owner_full_name: null })
+      : undefined;
   }
 }

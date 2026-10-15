@@ -21,6 +21,88 @@ x-demo-user-id: user_rahul  # Rahul Sharma (Equipment Owner)
 x-demo-user-id: user_admin  # Administrator
 ```
 
+## Booking Workflow
+
+### Create a booking request
+
+- **Endpoint:** `POST /api/bookings`
+- **Auth Required:** Yes (authenticated renter)
+- **Authorization:** The renter must not own the selected equipment. The listing must exist and be active.
+- **Request Body:**
+  ```json
+  {
+    "equipment_id": "eq_tractor_rahul",
+    "start_date": "2031-03-10T10:00:00.000Z",
+    "end_date": "2031-03-10T12:00:00.000Z",
+    "notes": "Field preparation"
+  }
+  ```
+- `total_hours` is not authoritative and is ignored if supplied. The backend validates the timestamps and calculates duration, platform fee, and total price from the persisted equipment rate.
+- Availability windows and blocked periods are enforced when the owner accepts the request.
+- **Response (201 Created):**
+  ```json
+  {
+    "success": true,
+    "message": "Booking request submitted to owner.",
+    "data": {
+      "booking": {
+        "id": "book_...",
+        "renter_id": "user_amit",
+        "equipment_id": "eq_tractor_rahul",
+        "start_date": "2031-03-10T10:00:00.000Z",
+        "end_date": "2031-03-10T12:00:00.000Z",
+        "total_hours": 2,
+        "base_price": 1800,
+        "platform_fee": 90,
+        "total_price": 1890,
+        "status": "pending"
+      }
+    }
+  }
+  ```
+
+### Booking history
+
+- `GET /api/bookings/my-rentals`
+  - Auth required.
+  - Returns bookings where the authenticated user is the renter.
+- `GET /api/bookings/my-equipment`
+  - Auth required.
+  - Returns bookings for equipment owned by the authenticated user.
+- `GET /api/bookings/:id`
+  - Auth required.
+  - Only the renter, equipment owner, or an administrator may read the booking.
+- **Response shape:**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "bookings": []
+    }
+  }
+  ```
+  The detail endpoint returns `booking`, `equipment`, `renter`, and `owner` under `data`.
+
+### Booking status transitions
+
+- **Endpoint:** `PATCH /api/bookings/:id/status`
+- **Auth Required:** Yes
+- **Request Body:**
+  ```json
+  {
+    "status": "accepted"
+  }
+  ```
+- Equipment owners or administrators may accept/reject pending requests.
+- The renter may cancel an eligible booking; participant authorization is enforced.
+- Valid public transitions are:
+  - `pending` -> `accepted`, `rejected`, `cancelled`
+  - `accepted` -> `cancelled`
+  - `confirmed` -> `cancelled`
+- Payment confirmation, rental-session transitions, completion, and dispute transitions are handled by their respective services and cannot be performed through this public endpoint.
+- Acceptance returns `409 Conflict` for inactive equipment, overlapping reserved bookings, or availability/blocked-period conflicts.
+- Invalid transitions return `400`; unauthorized actions return `403`; missing bookings return `404`.
+
 ### Authorization Rules
 1. **Rental Sessions & Tracking:** Only the booking's `renter_id`, the equipment's `owner_id`, or an administrator can access or control telemetry. Public marketplace listings never expose live coordinates.
 2. **Payments:** Only the verified booking renter can create an order or submit verification.

@@ -25,6 +25,7 @@ const equipmentRow = {
 class FakeClient {
   public readonly calls: string[] = [];
   public overlap = false;
+  public bookable = true;
   public currentBooking = {
     id: 'book_1',
     renter_id: 'renter_1',
@@ -55,6 +56,9 @@ class FakeClient {
     }
     if (text.includes('SELECT EXISTS')) {
       return { rows: [{ exists: this.overlap }] as T[] };
+    }
+    if (text.includes('equipment_availability_windows')) {
+      return { rows: [{ available: this.bookable }] as T[] };
     }
     if (text.includes('FROM bookings b')) {
       return {
@@ -126,6 +130,13 @@ describe('BookingService', () => {
     await expect(createService(new FakeClient()).createPending({
       renterId: 'renter_1',
       equipmentId: 'eq_1',
+      startDate: 'not-a-date',
+      endDate: '2026-02-01T10:00:00.000Z',
+    })).rejects.toMatchObject({ status: 400 });
+
+    await expect(createService(new FakeClient()).createPending({
+      renterId: 'renter_1',
+      equipmentId: 'eq_1',
       startDate: '2026-02-01T12:00:00.000Z',
       endDate: '2026-02-01T10:00:00.000Z',
     })).rejects.toMatchObject({ status: 400 });
@@ -149,5 +160,16 @@ describe('BookingService', () => {
     client.currentBooking.status = 'completed';
     await expect(createService(client).transition('book_1', 'accepted', 'owner_1', false))
       .rejects.toMatchObject({ status: 400 });
+
+    client.currentBooking.status = 'pending';
+    await expect(createService(client).transition('book_1', 'confirmed', 'owner_1', false))
+      .rejects.toMatchObject({ status: 400 });
+    await expect(createService(client).transition('book_1', 'accepted', 'renter_1', false))
+      .rejects.toMatchObject({ status: 403 });
+
+    client.currentBooking.status = 'pending';
+    client.bookable = false;
+    await expect(createService(client).transition('book_1', 'accepted', 'owner_1', false))
+      .rejects.toMatchObject({ status: 409 });
   });
 });

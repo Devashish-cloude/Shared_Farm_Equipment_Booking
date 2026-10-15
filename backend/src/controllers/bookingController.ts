@@ -3,7 +3,14 @@ import { v4 as uuidv4 } from 'uuid';
 import { store } from '../services/store.js';
 import { NotificationService } from '../services/notificationService.js';
 import { config } from '../config/env.js';
-import { BookingService, BookingServiceError } from '../services/bookingService.js';
+import {
+  assertBookingTransition,
+  BookingService,
+  BookingServiceError,
+  parseBookingPeriod,
+} from '../services/bookingService.js';
+import { AvailabilityService } from '../services/availabilityService.js';
+import { RESERVED_BOOKING_STATUSES } from '../repositories/bookingRepository.js';
 import { AuthenticatedRequest, Booking, BookingStatus } from '../types/index.js';
 
 function usePostgres(): boolean {
@@ -14,18 +21,43 @@ function createBookingService(): BookingService {
   return new BookingService();
 }
 
+function isRequestBody(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 export class BookingController {
   public static async createBooking(
     req: AuthenticatedRequest,
     res: Response,
     next: NextFunction
   ): Promise<void> {
-    const { equipment_id, start_date, end_date, total_hours, notes } = req.body;
-
-    if (!equipment_id || !start_date || !end_date || !total_hours) {
+    if (!isRequestBody(req.body)) {
       res.status(400).json({
         success: false,
-        error: 'equipment_id, start_date, end_date, and total_hours are required.',
+        error: 'Request body must be an object.',
+      });
+      return;
+    }
+    const { equipment_id, start_date, end_date, notes } = req.body;
+
+    if (
+      typeof equipment_id !== 'string' ||
+      typeof start_date !== 'string' ||
+      typeof end_date !== 'string' ||
+      !equipment_id.trim() ||
+      !start_date.trim() ||
+      !end_date.trim()
+    ) {
+      res.status(400).json({
+        success: false,
+        error: 'equipment_id, start_date, and end_date are required.',
+      });
+      return;
+    }
+    if (notes !== undefined && typeof notes !== 'string') {
+      res.status(400).json({
+        success: false,
+        error: 'notes must be a string.',
       });
       return;
     }
@@ -68,17 +100,37 @@ export class BookingController {
       return;
     }
 
-    const hours = parseFloat(total_hours);
-    const basePrice = hours * equipment.hourly_rate;
+    if (equipment.status !== 'active') {
+      res.status(400).json({
+        success: false,
+        error: 'Equipment is not available for booking.',
+      });
+      return;
+    }
+
+    let period: ReturnType<typeof parseBookingPeriod>;
+    try {
+      period = parseBookingPeriod(start_date, end_date);
+    } catch (error) {
+      if (error instanceof BookingServiceError) {
+        res.status(error.status).json({ success: false, error: error.message });
+        return;
+      }
+      next(error);
+      return;
+    }
+
+    const hours = period.hours;
+    const basePrice = Math.round(hours * equipment.hourly_rate * 100) / 100;
     const platformFee = Math.round(basePrice * 0.05 * 100) / 100; // 5% platform fee
-    const totalPrice = basePrice + platformFee;
+    const totalPrice = Math.round((basePrice + platformFee) * 100) / 100;
 
     const newBooking: Booking = {
       id: `book_${uuidv4().substring(0, 8)}`,
       renter_id: req.user!.id,
       equipment_id,
-      start_date,
-      end_date,
+      start_date: period.start,
+      end_date: period.end,
       total_hours: hours,
       hourly_rate: equipment.hourly_rate,
       base_price: basePrice,
@@ -286,6 +338,18 @@ export class BookingController {
       return;
     }
 
+    try {
+      assertBookingTransition('pending', status);
+    } catch {
+      if (!['accepted', 'rejected', 'cancelled'].includes(status)) {
+        res.status(400).json({
+          success: false,
+          error: `Booking status '${status}' cannot be changed through this endpoint.`,
+        });
+        return;
+      }
+    }
+
     const booking = store.getBookingById(id);
     if (!booking) {
       res.status(404).json({ success: false, error: 'Booking not found.' });
@@ -302,11 +366,53 @@ export class BookingController {
       return;
     }
 
+    try {
+      assertBookingTransition(booking.status, status);
+    } catch (error) {
+      if (error instanceof BookingServiceError) {
+        res.status(error.status).json({ success: false, error: error.message });
+        return;
+      }
+      next(error);
+      return;
+    }
+
     // Owner actions
     if (status === 'accepted' || status === 'rejected') {
       if (!isOwner && !isAdmin) {
         res.status(403).json({ success: false, error: 'Only the equipment owner can accept or reject bookings.' });
         return;
+      }
+
+      if (status === 'accepted') {
+        const bookable = await new AvailabilityService().isBookableInMemory(
+          booking.equipment_id,
+          booking.start_date,
+          booking.end_date
+        );
+        if (!bookable) {
+          res.status(409).json({
+            success: false,
+            error: 'The booking is outside the equipment availability or falls in a blocked period.',
+          });
+          return;
+        }
+
+        const hasReservedOverlap = Array.from(store.bookings.values()).some(
+          (existingBooking) =>
+            existingBooking.id !== booking.id &&
+            existingBooking.equipment_id === booking.equipment_id &&
+            RESERVED_BOOKING_STATUSES.includes(existingBooking.status) &&
+            existingBooking.start_date < booking.end_date &&
+            existingBooking.end_date > booking.start_date
+        );
+        if (hasReservedOverlap) {
+          res.status(409).json({
+            success: false,
+            error: 'The equipment is already reserved for an overlapping period.',
+          });
+          return;
+        }
       }
 
       booking.status = status;
@@ -326,9 +432,6 @@ export class BookingController {
       });
     } else if (status === 'cancelled') {
       booking.status = 'cancelled';
-      store.bookings.set(booking.id, booking);
-    } else {
-      booking.status = status;
       store.bookings.set(booking.id, booking);
     }
 
