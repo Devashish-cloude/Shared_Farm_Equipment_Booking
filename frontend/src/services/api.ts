@@ -1,4 +1,40 @@
-const API_BASE = '/api';
+import axios from 'axios';
+
+// Configurable API URL through environment variable
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+
+export const apiClient = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  timeout: 10000,
+});
+
+// Request interceptor to attach JWT token if available
+apiClient.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('shared_farm_token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// Response interceptor for unified error formatting
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    // Standardized error extraction
+    const message =
+      error.response?.data?.message ||
+      error.message ||
+      'An unexpected server error occurred. Please check backend connection.';
+    return Promise.reject(new Error(message));
+  }
+);
 
 export interface UserSession {
   id: string;
@@ -44,15 +80,14 @@ export const getActiveUser = (): UserSession => {
   return currentActiveUser;
 };
 
-// Base fetcher with automatic auth injection
+// Base fetcher with automatic auth injection for person 3 components
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const activeUser = getActiveUser();
   const headers = new Headers(options.headers || {});
   headers.set('Content-Type', 'application/json');
-  // Pass demo user header for seamless role switching during evaluation
   headers.set('x-demo-user-id', activeUser.id);
 
-  const res = await fetch(`${API_BASE}${endpoint}`, {
+  const res = await fetch(`${API_BASE_URL}${endpoint}`, {
     ...options,
     headers,
   });
