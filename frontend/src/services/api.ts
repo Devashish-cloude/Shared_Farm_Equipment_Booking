@@ -1,7 +1,10 @@
 import axios from 'axios';
 
 // Configurable API URL through environment variable
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+export const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ||
+  import.meta.env.VITE_API_URL ||
+  'http://localhost:5001/api';
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -11,24 +14,57 @@ export const apiClient = axios.create({
   timeout: 10000,
 });
 
-// Request interceptor to attach JWT token if available
+// Request interceptor to attach JWT token and demo user ID if available
 apiClient.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('shared_farm_token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    const savedUserId = localStorage.getItem('shared_farm_user_id') || 'user_amit';
+    if (savedUserId && !config.headers['x-demo-user-id']) {
+      config.headers['x-demo-user-id'] = savedUserId;
+    }
     return config;
   },
   (error) => Promise.reject(error)
 );
 
-// Response interceptor for unified error formatting
+// Response interceptor for unified response unwrapping and error formatting
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    const body = response.data;
+    if (body && typeof body === 'object' && body.success && body.data !== undefined) {
+      const data = body.data;
+      if (data && typeof data === 'object') {
+        if (Array.isArray(data.equipment)) {
+          response.data = data.equipment;
+          return response;
+        }
+        if (data.equipment && !Array.isArray(data.equipment)) {
+          response.data = { ...data.equipment, owner: data.owner };
+          return response;
+        }
+        if (Array.isArray(data.bookings)) {
+          response.data = data.bookings;
+          return response;
+        }
+        if (data.booking) {
+          response.data = data.booking;
+          return response;
+        }
+        if (data.user && !data.token) {
+          response.data = data.user;
+          return response;
+        }
+      }
+      response.data = data;
+    }
+    return response;
+  },
   (error) => {
-    // Standardized error extraction
     const message =
+      error.response?.data?.error ||
       error.response?.data?.message ||
       error.message ||
       'An unexpected server error occurred. Please check backend connection.';
