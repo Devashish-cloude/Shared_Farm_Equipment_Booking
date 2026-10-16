@@ -1,24 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useLocation, Link } from 'react-router-dom';
 import { bookingsService } from '../../services/bookings.service';
+import { useLanguage } from '../../context/LanguageContext';
 import { Booking } from '../../types';
 import { Button } from '../../components/ui/Button';
 import { formatCurrency, formatDate } from '../../lib/utils';
 import { resolveEquipmentImage } from '../../lib/equipmentImages';
 import {
   CheckCircle2,
-  Calendar,
-  Clock,
-  Navigation,
-  FileText,
-  ArrowRight,
   ShieldCheck,
-  Tractor
 } from 'lucide-react';
 
 export const BookingConfirmationPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
+  const { t } = useLanguage();
   const transactionId = (location.state as any)?.transactionId || `SF-PAY-DEMO-${Date.now()}`;
 
   const [booking, setBooking] = useState<Booking | null>(null);
@@ -38,13 +34,14 @@ export const BookingConfirmationPage: React.FC = () => {
 
         <div className="space-y-1">
           <span className="text-[10px] font-extrabold uppercase px-3 py-1 rounded-full bg-[#B8D96B]/30 text-[#164B35]">
-            Booking Confirmed &bull; Escrow Secured
+            {t('confirm.tag', 'Booking Confirmed • Escrow Secured')}
           </span>
           <h1 className="text-2xl font-extrabold font-heading text-[#164B35] pt-2">
-            Equipment Reserved Successfully!
+            {t('confirm.title', 'Equipment Reserved Successfully!')}
           </h1>
           <p className="text-xs text-[#526058]">
-            Transaction Ref: <code className="font-mono font-bold text-[#25312A]">{transactionId}</code>
+            {t('confirm.txRef', 'Transaction Ref:')}{' '}
+            <code className="font-mono font-bold text-[#25312A]">{transactionId}</code>
           </p>
         </div>
 
@@ -58,27 +55,41 @@ export const BookingConfirmationPage: React.FC = () => {
               />
               <div>
                 <h4 className="text-xs font-bold text-[#25312A] font-heading">{booking.equipmentName}</h4>
-                <p className="text-[11px] text-[#526058]">Owner: {booking.ownerName}</p>
+                <p className="text-[11px] text-[#526058]">
+                  {t('summary.owner', 'Owner')}: {booking.ownerName}
+                </p>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div>
-                <span className="text-[10px] text-[#7C8C83] uppercase block">Scheduled Date</span>
+                <span className="text-[10px] text-[#7C8C83] uppercase block">
+                  {t('confirm.scheduledDate', 'Scheduled Date')}
+                </span>
                 <span className="font-semibold text-[#25312A]">{formatDate(booking.startDate)}</span>
               </div>
               <div>
-                <span className="text-[10px] text-[#7C8C83] uppercase block">Duration</span>
-                <span className="font-semibold text-[#25312A]">{booking.durationHours} Hours</span>
+                <span className="text-[10px] text-[#7C8C83] uppercase block">
+                  {t('confirm.duration', 'Duration')}
+                </span>
+                <span className="font-semibold text-[#25312A]">
+                  {booking.durationHours} {t('details.hours', 'Hours')}
+                </span>
               </div>
               <div>
-                <span className="text-[10px] text-[#7C8C83] uppercase block">Total Paid</span>
+                <span className="text-[10px] text-[#7C8C83] uppercase block">
+                  {t('confirm.totalPaid', 'Total Paid')}
+                </span>
                 <span className="font-semibold text-[#164B35]">{formatCurrency(booking.totalPrice)}</span>
               </div>
               <div>
-                <span className="text-[10px] text-[#7C8C83] uppercase block">Operator Status</span>
+                <span className="text-[10px] text-[#7C8C83] uppercase block">
+                  {t('confirm.operatorStatus', 'Operator Status')}
+                </span>
                 <span className="font-semibold text-[#25312A]">
-                  {booking.withOperator ? 'Driver Included' : 'Self-Operated'}
+                  {booking.withOperator
+                    ? t('confirm.driverIncluded', 'Driver Included')
+                    : t('confirm.selfOperated', 'Self-Operated')}
                 </span>
               </div>
             </div>
@@ -88,19 +99,22 @@ export const BookingConfirmationPage: React.FC = () => {
         <div className="p-3 bg-[#F0F5F2] rounded-xl border border-[#BCD3C6] text-xs text-[#526058] flex items-center gap-2 text-left">
           <ShieldCheck className="w-5 h-5 text-[#347653] shrink-0" />
           <span>
-            The machinery owner has been notified. You can track progress or message the owner inside your Unified Dashboard.
+            {t(
+              'confirm.notified',
+              'The machinery owner has been notified. You can track progress or message the owner inside your Unified Dashboard.'
+            )}
           </span>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
           <Link to="/dashboard/rentals">
             <Button variant="primary" size="md" className="w-full">
-              View In My Rentals
+              {t('confirm.viewRentals', 'View In My Rentals')}
             </Button>
           </Link>
           <Link to="/dashboard">
             <Button variant="outline" size="md" className="w-full">
-              Farmer Dashboard
+              {t('confirm.farmerDash', 'Farmer Dashboard')}
             </Button>
           </Link>
         </div>

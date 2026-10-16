@@ -4,6 +4,7 @@ import { equipmentService } from '../../services/equipment.service';
 import { bookingsService } from '../../services/bookings.service';
 import { mockStore } from '../../services/mockStore';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { Equipment, Review } from '../../types';
 import { RatingDisplay } from '../../components/ui/RatingDisplay';
 import { StatusBadge } from '../../components/ui/StatusBadge';
@@ -17,15 +18,11 @@ import {
   Calendar,
   Clock,
   ShieldCheck,
-  UserCheck,
-  Check,
   Zap,
   Wrench,
   ChevronLeft,
   ArrowRight,
-  Info,
-  CheckCircle2,
-  Share2
+  Info
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -33,6 +30,7 @@ export const EquipmentDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
+  const { t } = useLanguage();
 
   const [equipment, setEquipment] = useState<Equipment | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -66,19 +64,19 @@ export const EquipmentDetailsPage: React.FC = () => {
           setSimilarEquipment(all.filter((e) => e.id !== item.id).slice(0, 3));
         }
       } catch (err: any) {
-        toast.error('Failed to load equipment details');
+        toast.error(t('details.requestFailed', 'Failed to load equipment details'));
       } finally {
         setIsLoading(false);
       }
     };
     loadDetails();
-  }, [id]);
+  }, [id, t]);
 
   if (isLoading) {
     return (
       <div className="max-w-7xl mx-auto px-4 py-16 text-center text-[#526058]">
         <div className="w-8 h-8 border-3 border-[#164B35] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-        <p className="text-sm font-semibold">Loading equipment details...</p>
+        <p className="text-sm font-semibold">{t('details.loading', 'Loading equipment details...')}</p>
       </div>
     );
   }
@@ -86,10 +84,14 @@ export const EquipmentDetailsPage: React.FC = () => {
   if (!equipment) {
     return (
       <div className="max-w-7xl mx-auto px-4 py-16 text-center space-y-4">
-        <h2 className="text-2xl font-bold font-heading text-[#164B35]">Equipment Not Found</h2>
-        <p className="text-sm text-[#526058]">This listing may have been unlisted or removed.</p>
+        <h2 className="text-2xl font-bold font-heading text-[#164B35]">
+          {t('details.notFound', 'Equipment Not Found')}
+        </h2>
+        <p className="text-sm text-[#526058]">
+          {t('details.notFoundDesc', 'This listing may have been unlisted or removed.')}
+        </p>
         <Link to="/equipment">
-          <Button variant="primary">Browse Marketplace</Button>
+          <Button variant="primary">{t('details.browse', 'Browse Marketplace')}</Button>
         </Link>
       </div>
     );
@@ -105,13 +107,13 @@ export const EquipmentDetailsPage: React.FC = () => {
   const handleBookingRequest = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isAuthenticated) {
-      toast.info('Please sign in or create a farmer account to book equipment');
+      toast.info(t('details.needLogin', 'Please sign in or create a farmer account to book equipment'));
       navigate('/login', { state: { from: { pathname: `/equipment/${equipment.id}` } } });
       return;
     }
 
     if (user?.id === equipment.ownerId) {
-      toast.error('You are the owner of this equipment listing!');
+      toast.error(t('details.ownListing', 'You are the owner of this equipment listing!'));
       return;
     }
 
@@ -144,10 +146,10 @@ export const EquipmentDetailsPage: React.FC = () => {
         renterNotes,
       });
 
-      toast.success('Booking requested! Proceeding to summary & test checkout.');
+      toast.success(t('details.requestSuccess', 'Booking requested! Proceeding to summary & test checkout.'));
       navigate(`/booking/${newBooking.id}`);
     } catch (err: any) {
-      toast.error(err.message || 'Failed to submit booking request');
+      toast.error(err.message || t('details.requestFailed', 'Failed to submit booking request'));
     } finally {
       setIsBookingSubmitting(false);
     }
@@ -162,7 +164,7 @@ export const EquipmentDetailsPage: React.FC = () => {
           className="flex items-center gap-1 font-bold text-[#164B35] hover:underline"
         >
           <ChevronLeft className="w-4 h-4" />
-          <span>Back to Marketplace</span>
+          <span>{t('details.back', 'Back to Marketplace')}</span>
         </button>
         <span>
           {equipment.category} &bull; {equipment.make} &bull; {equipment.model}
@@ -210,7 +212,7 @@ export const EquipmentDetailsPage: React.FC = () => {
           <div className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <span className="text-xs font-bold text-[#347653] uppercase tracking-wider">
-                {equipment.category} &bull; Year {equipment.year}
+                {equipment.category} &bull; {equipment.year}
               </span>
               <RatingDisplay rating={equipment.rating} reviewCount={equipment.reviewCount} size="md" />
             </div>
@@ -223,13 +225,14 @@ export const EquipmentDetailsPage: React.FC = () => {
               <div className="flex items-center gap-1.5">
                 <MapPin className="w-4 h-4 text-[#347653]" />
                 <span>
-                  {equipment.location.village}, {equipment.location.district}, {equipment.location.state} (Approximate area)
+                  {equipment.location.village}, {equipment.location.district}, {equipment.location.state}{' '}
+                  {t('details.approxArea', '(Approximate area)')}
                 </span>
               </div>
               {equipment.powerHp && (
                 <div className="flex items-center gap-1.5">
                   <Zap className="w-4 h-4 text-amber-600" />
-                  <span>{equipment.powerHp} HP Power</span>
+                  <span>{equipment.powerHp} {t('details.power', 'HP Power')}</span>
                 </div>
               )}
             </div>
@@ -237,7 +240,9 @@ export const EquipmentDetailsPage: React.FC = () => {
 
           {/* Description */}
           <div className="bg-white p-6 rounded-2xl border border-[#E2E7DE] shadow-sm space-y-3">
-            <h3 className="font-heading font-bold text-base text-[#25312A]">About This Machinery</h3>
+            <h3 className="font-heading font-bold text-base text-[#25312A]">
+              {t('details.about', 'About This Machinery')}
+            </h3>
             <p className="text-xs sm:text-sm text-[#526058] leading-relaxed whitespace-pre-line">
               {equipment.description}
             </p>
@@ -248,7 +253,7 @@ export const EquipmentDetailsPage: React.FC = () => {
             <div className="flex items-center gap-2 pb-2 border-b border-[#E2E7DE]">
               <Wrench className="w-4 h-4 text-[#347653]" />
               <h3 className="font-heading font-bold text-base text-[#25312A]">
-                Technical Specifications
+                {t('details.specs', 'Technical Specifications')}
               </h3>
             </div>
 
@@ -266,8 +271,8 @@ export const EquipmentDetailsPage: React.FC = () => {
                 <span className="font-semibold text-[#164B35]">{equipment.condition}</span>
               </div>
               <div className="flex justify-between py-2 border-b border-[#F0F5F2]">
-                <span className="text-[#7C8C83]">Min Rental Period:</span>
-                <span className="font-semibold text-[#25312A]">{equipment.minRentalHours} Hours</span>
+                <span className="text-[#7C8C83]">{t('details.minDuration', 'Minimum Rental Duration')}:</span>
+                <span className="font-semibold text-[#25312A]">{equipment.minRentalHours} {t('details.hours', 'Hours')}</span>
               </div>
 
               {Object.entries(equipment.specifications || {}).map(([key, val]) => (
@@ -293,11 +298,11 @@ export const EquipmentDetailsPage: React.FC = () => {
                     <span>{equipment.ownerName}</span>
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#B8D96B]/30 text-[#164B35] text-[10px] font-bold">
                       <ShieldCheck className="w-3 h-3 text-[#164B35]" />
-                      Verified
+                      {t('details.verified', 'Verified')}
                     </span>
                   </h4>
                   <p className="text-xs text-[#526058]">
-                    {equipment.location.village}, {equipment.location.district} &bull; Member since 2024
+                    {equipment.location.village}, {equipment.location.district} &bull; {t('details.memberSince', 'Member since 2024')}
                   </p>
                 </div>
               </div>
@@ -305,8 +310,8 @@ export const EquipmentDetailsPage: React.FC = () => {
             </div>
 
             <div className="text-xs text-[#526058] flex items-center gap-4 pt-2 border-t border-[#CBD5C7]">
-              <span>&bull; {equipment.completedRentalsCount} Successful Rentals</span>
-              <span>&bull; Response time: under 1 hr</span>
+              <span>&bull; {equipment.completedRentalsCount} {t('details.successfulRentals', 'Successful Rentals')}</span>
+              <span>&bull; {t('details.responseTime', 'Response time: under 1 hr')}</span>
             </div>
           </div>
 
@@ -314,14 +319,14 @@ export const EquipmentDetailsPage: React.FC = () => {
           <div className="bg-white p-6 rounded-2xl border border-[#E2E7DE] shadow-sm space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-[#E2E7DE]">
               <h3 className="font-heading font-bold text-base text-[#25312A]">
-                Farmer Reviews ({reviews.length})
+                {t('details.farmerReviews', 'Farmer Reviews')} ({reviews.length})
               </h3>
               <RatingDisplay rating={equipment.rating} size="sm" />
             </div>
 
             {reviews.length === 0 ? (
               <p className="text-xs text-[#7C8C83] py-4 text-center">
-                No reviews yet for this listing. Be the first farmer to rent and review!
+                {t('details.noReviews', 'No reviews yet for this listing. Be the first farmer to rent and review!')}
               </p>
             ) : (
               <div className="space-y-4">
@@ -337,7 +342,7 @@ export const EquipmentDetailsPage: React.FC = () => {
                         <span className="text-xs font-bold text-[#25312A]">{rev.reviewerName}</span>
                         {rev.verifiedRental && (
                           <span className="text-[10px] text-[#347653] font-semibold bg-emerald-50 px-2 py-0.5 rounded-full">
-                            Verified Rental
+                            {t('details.verifiedRental', 'Verified Rental')}
                           </span>
                         )}
                       </div>
@@ -372,7 +377,7 @@ export const EquipmentDetailsPage: React.FC = () => {
             <form onSubmit={handleBookingRequest} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-[#25312A] mb-1.5">
-                  Rental Date *
+                  {t('details.rentalDate', 'Rental Date *')}
                 </label>
                 <div className="relative">
                   <Calendar className="w-4 h-4 text-[#347653] absolute left-3 top-3" />
@@ -389,7 +394,7 @@ export const EquipmentDetailsPage: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-bold text-[#25312A] mb-1.5">
-                  Estimated Work Duration (Hours) *
+                  {t('details.estDuration', 'Estimated Work Duration (Hours) *')}
                 </label>
                 <div className="grid grid-cols-4 gap-2">
                   {[4, 6, 8, 12].map((hrs) => (
@@ -403,7 +408,7 @@ export const EquipmentDetailsPage: React.FC = () => {
                           : 'bg-[#F7F8F2] text-[#25312A] border-[#CBD5C7] hover:bg-[#EFF2EB]'
                       }`}
                     >
-                      {hrs} hrs
+                      {hrs} {t('details.hours', 'hrs')}
                     </button>
                   ))}
                 </div>
@@ -420,9 +425,11 @@ export const EquipmentDetailsPage: React.FC = () => {
                       className="w-4 h-4 rounded text-[#164B35] mt-0.5 accent-[#164B35]"
                     />
                     <div>
-                      <span>Include Trained Machine Driver (+₹{equipment.operatorCostPerHour || 100}/hr)</span>
+                      <span>
+                        {t('details.driverOption', 'Include Trained Machine Driver')} (+₹{equipment.operatorCostPerHour || 100}/hr)
+                      </span>
                       <p className="text-[11px] text-[#526058] font-normal mt-0.5">
-                        Recommended: Owner driver handles diesel efficiency and field maneuvers.
+                        {t('details.driverDesc', 'Recommended: Owner driver handles diesel efficiency and field maneuvers.')}
                       </p>
                     </div>
                   </label>
@@ -431,12 +438,12 @@ export const EquipmentDetailsPage: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-bold text-[#25312A] mb-1.5">
-                  Field Notes &amp; Crop Requirements
+                  {t('details.fieldNotes', 'Field Notes & Crop Requirements')}
                 </label>
                 <textarea
                   value={renterNotes}
                   onChange={(e) => setRenterNotes(e.target.value)}
-                  placeholder="Mention field parcel location, soil dryness, or any specific hookup needed..."
+                  placeholder={t('details.fieldNotesPlaceholder', 'Mention field parcel location, soil dryness, or any specific hookup needed...')}
                   rows={2}
                   className="w-full text-xs p-2.5 rounded-xl border border-[#CBD5C7] bg-[#F7F8F2]/60 focus:outline-none focus:ring-2 focus:ring-[#164B35] text-[#25312A]"
                 />
@@ -445,23 +452,23 @@ export const EquipmentDetailsPage: React.FC = () => {
               {/* Price Breakdown */}
               <div className="pt-3 border-t border-[#E2E7DE] space-y-2 text-xs">
                 <div className="flex justify-between text-[#526058]">
-                  <span>Machine Rental ({durationHours} hrs &times; ₹{equipment.pricePerHour}):</span>
+                  <span>{t('details.machineRental', 'Machine Rental')} ({durationHours} hrs &times; ₹{equipment.pricePerHour}):</span>
                   <span>{formatCurrency(basePrice)}</span>
                 </div>
                 {withOperator && (
                   <div className="flex justify-between text-[#526058]">
-                    <span>Driver Fee ({durationHours} hrs &times; ₹{equipment.operatorCostPerHour || 100}):</span>
+                    <span>{t('details.driverFee', 'Driver Fee')} ({durationHours} hrs &times; ₹{equipment.operatorCostPerHour || 100}):</span>
                     <span>{formatCurrency(operatorPrice)}</span>
                   </div>
                 )}
                 <div className="flex justify-between text-[#526058]">
-                  <span>Escrow Platform Fee (4%):</span>
+                  <span>{t('details.escrowFee', 'Escrow Platform Fee (4%)')}:</span>
                   <span>{formatCurrency(platformFee)}</span>
                 </div>
                 <div className="flex justify-between text-[#526058]">
                   <span className="flex items-center gap-1">
-                    Refundable Security Deposit:
-                    <span title="Returned upon equipment inspection">
+                    {t('details.securityDeposit', 'Refundable Security Deposit')}:
+                    <span title={t('details.depositTooltip', 'Returned upon equipment inspection')}>
                       <Info className="w-3 h-3 text-[#7C8C83]" />
                     </span>
                   </span>
@@ -469,7 +476,7 @@ export const EquipmentDetailsPage: React.FC = () => {
                 </div>
 
                 <div className="pt-2 border-t border-[#E2E7DE] flex justify-between text-sm font-extrabold text-[#164B35]">
-                  <span>Estimated Total:</span>
+                  <span>{t('details.estTotal', 'Estimated Total:')}</span>
                   <span>{formatCurrency(totalDue)}</span>
                 </div>
               </div>
@@ -482,13 +489,8 @@ export const EquipmentDetailsPage: React.FC = () => {
                 isLoading={isBookingSubmitting}
                 rightIcon={<ArrowRight className="w-4 h-4" />}
               >
-                Request Booking
+                {t('details.requestBtn', 'Request Rental Booking')}
               </Button>
-
-              <div className="flex items-center justify-center gap-1 text-[11px] text-[#7C8C83]">
-                <ShieldCheck className="w-3.5 h-3.5 text-[#347653]" />
-                <span>You will review terms before simulated payment</span>
-              </div>
             </form>
           </div>
         </div>

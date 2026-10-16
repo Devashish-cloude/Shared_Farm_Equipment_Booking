@@ -436,4 +436,137 @@ export class PaymentController {
     const payments = store.getPaymentsByBookingId(bookingId);
     res.status(200).json({ success: true, data: { payments } });
   }
+
+  /**
+   * POST /api/payments/:bookingId/charge
+   * Authorizes a test payment for a booking using authoritative server pricing
+   */
+  public static async chargeBooking(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+    const { bookingId } = req.params;
+    const { method = 'upi' } = req.body;
+
+    if (!bookingId) {
+      res.status(400).json({ success: false, error: 'Booking ID is required.' });
+      return;
+    }
+
+    if (usePostgres()) {
+      try {
+        const orderResult = await paymentService().createOrder(bookingId, req.user!.id, Boolean(req.user!.is_admin));
+        const demoPaymentId = `pay_sim_${uuidv4().substring(0, 10)}`;
+        const demoSignature = PaymentController.generateDemoSignature(
+          orderResult.payment.razorpay_order_id,
+          demoPaymentId,
+          appConfig.razorpayKeySecret
+        );
+
+        const verifyResult = await paymentService().verify(
+          orderResult.payment.razorpay_order_id,
+          demoPaymentId,
+          demoSignature,
+          req.user!.id,
+          Boolean(req.user!.is_admin),
+          appConfig.razorpayKeySecret,
+          true
+        );
+
+        res.status(200).json({
+          success: true,
+          message: 'Test payment authorized successfully!',
+          data: {
+            transactionId: demoPaymentId,
+            orderId: orderResult.payment.razorpay_order_id,
+            amount: orderResult.booking.total_price,
+            bookingStatus: verifyResult.bookingStatus,
+            paymentStatus: 'paid',
+          },
+        });
+      } catch (error) {
+        if (error instanceof PaymentServiceError) {
+          res.status(error.status).json({ success: false, error: error.message });
+          return;
+        }
+        next(error);
+      }
+      return;
+    }
+
+    const booking = store.getBookingById(bookingId);
+    if (!booking) {
+      res.status(404).json({ success: false, error: 'Booking not found.' });
+      return;
+    }
+
+    // Only renter can pay
+    if (booking.renter_id !== req.user?.id && !req.user?.is_admin) {
+      res.status(403).json({
+        success: false,
+        error: 'Forbidden: You are not authorized to pay for this booking.',
+      });
+      return;
+    }
+
+    // Idempotency: if already paid, return existing success
+    if (booking.status === 'confirmed' || (booking as any).payment_status === 'paid') {
+      res.status(200).json({
+        success: true,
+        message: 'Payment was already verified and captured (idempotent response).',
+        data: {
+          transactionId: `pay_already_paid_${booking.id.substring(0, 8)}`,
+          amount: booking.total_price,
+          bookingStatus: booking.status,
+          paymentStatus: 'paid',
+        },
+      });
+      return;
+    }
+
+    if (booking.status === 'cancelled' || booking.status === 'rejected') {
+      res.status(400).json({
+        success: false,
+        error: `Cannot pay for a ${booking.status} booking.`,
+      });
+      return;
+    }
+
+    const demoTxnId = `SF-PAY-${Date.now()}-${uuidv4().substring(0, 6).toUpperCase()}`;
+    const paymentRecord: Payment = {
+      id: `pay_${uuidv4().substring(0, 8)}`,
+      booking_id: booking.id,
+      user_id: req.user!.id,
+      razorpay_order_id: `order_${uuidv4().replace(/-/g, '').substring(0, 14)}`,
+      razorpay_payment_id: demoTxnId,
+      amount: booking.total_price,
+      currency: 'INR',
+      status: 'captured',
+      payment_method: method,
+      idempotency_key: `charge_${booking.id}_${Date.now()}`,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    store.createPayment(paymentRecord);
+    store.updateBookingStatus(booking.id, 'confirmed');
+
+    // Notify owner
+    const equipment = store.getEquipmentById(booking.equipment_id);
+    NotificationService.notifyPaymentSuccess(
+      booking.id,
+      equipment?.title || 'Farm Equipment',
+      booking.total_price,
+      booking.renter_id,
+      equipment?.owner_id || ''
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Test payment authorized successfully!',
+      data: {
+        transactionId: demoTxnId,
+        amount: booking.total_price,
+        bookingStatus: 'confirmed',
+        paymentStatus: 'paid',
+      },
+    });
+  }
 }

@@ -16,4 +16,7 @@ router.post('/payments/webhook', PaymentController.handleWebhook);
 // Payment history for a booking
 router.get('/payments/booking/:bookingId', authenticate, PaymentController.getBookingPayments);
 
+// Authorize test payment for a booking
+router.post('/payments/:bookingId/charge', authenticate, PaymentController.chargeBooking);
+
 export default router;

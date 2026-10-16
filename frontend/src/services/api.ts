@@ -1,10 +1,16 @@
 import axios from 'axios';
 
-// Configurable API URL through environment variable
+// In production or when running on hosted domain (e.g. Vercel), never default to localhost
+const isLocalhostHost =
+  typeof window !== 'undefined' &&
+  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
 export const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ||
-  import.meta.env.VITE_API_URL ||
-  (import.meta.env.PROD ? '/api' : 'http://localhost:5001/api');
+  (import.meta.env.VITE_API_BASE_URL && !import.meta.env.VITE_API_BASE_URL.includes('localhost'))
+    ? import.meta.env.VITE_API_BASE_URL
+    : (import.meta.env.VITE_API_URL && !import.meta.env.VITE_API_URL.includes('localhost'))
+      ? import.meta.env.VITE_API_URL
+      : (isLocalhostHost ? 'http://localhost:5001/api' : '/api');
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -63,11 +69,25 @@ apiClient.interceptors.response.use(
     return response;
   },
   (error) => {
-    const message =
+    let message =
       error.response?.data?.error ||
-      error.response?.data?.message ||
-      error.message ||
-      'An unexpected server error occurred. Please check backend connection.';
+      error.response?.data?.message;
+
+    if (!message) {
+      if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+        message = 'Unable to connect to payment server. Please check your network and retry.';
+      } else if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        message = 'Payment request timed out. Please check your connection and retry.';
+      } else if (error.response?.status === 404) {
+        message = 'This booking could not be found.';
+      } else if (error.response?.status === 403) {
+        message = 'You are not authorized to pay for this booking.';
+      } else if (error.response?.status >= 500) {
+        message = 'Payment could not be processed. Please try again later.';
+      } else {
+        message = error.message || 'Payment could not be processed. Please try again later.';
+      }
+    }
     return Promise.reject(new Error(message));
   }
 );

@@ -72,6 +72,10 @@ class MockDataStore {
     sessionStorage.clear();
   }
 
+  public reset() {
+    this.resetToDefaults();
+  }
+
   // Active User Session Management (Ensures account isolation)
   public getActiveUser(): User | null {
     const raw = sessionStorage.getItem('sf_active_user');
@@ -129,6 +133,10 @@ class MockDataStore {
 
   // Equipment
   public getEquipmentList(): Equipment[] {
+    return this.equipment;
+  }
+
+  public getEquipment(): Equipment[] {
     return this.equipment;
   }
 
@@ -225,6 +233,14 @@ class MockDataStore {
       }
       return b;
     });
+    this.save(STORAGE_KEYS.BOOKINGS, this.bookings);
+    const updated = this.bookings.find(b => b.id === id);
+    if (!updated) throw new Error('Booking not found');
+    return updated;
+  }
+
+  public updateBooking(id: string, updates: Partial<Booking>): Booking {
+    this.bookings = this.bookings.map(b => (b.id === id ? { ...b, ...updates } : b));
     this.save(STORAGE_KEYS.BOOKINGS, this.bookings);
     const updated = this.bookings.find(b => b.id === id);
     if (!updated) throw new Error('Booking not found');
