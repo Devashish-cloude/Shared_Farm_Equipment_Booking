@@ -7,11 +7,8 @@ const DEMO_MODE_KEY = 'sf_is_demo_mode';
 
 export const isDemoModeActive = (): boolean => {
   const saved = localStorage.getItem(DEMO_MODE_KEY);
-  if (saved !== null) {
-    return saved === 'true';
-  }
-  // Default to live mode if Supabase is configured; otherwise fallback to demo mode
-  return !isSupabaseConfigured();
+  // Default to false: new visitors must see the public homepage, NOT a demo session!
+  return saved === 'true';
 };
 
 export const setDemoModeActive = (active: boolean): void => {
@@ -25,11 +22,11 @@ export function mapProfileToUser(authUser: any, profile?: any): User {
     name: profile?.full_name || meta.full_name || meta.name || authUser.email?.split('@')[0] || 'Farmer',
     email: authUser.email || profile?.email || '',
     phone: profile?.phone || meta.phone || '',
-    avatar: profile?.avatar_url || meta.avatar_url,
+    avatar: profile?.avatar_url || meta.avatar_url || undefined,
     location: {
-      village: profile?.village || meta.village || 'Village',
-      district: profile?.district || meta.district || 'District',
-      state: profile?.state || meta.state || 'State',
+      village: profile?.village || meta.village || '',
+      district: profile?.district || meta.district || '',
+      state: profile?.state || meta.state || '',
     },
     verificationStatus: profile?.verification_status || 'unverified',
     memberSince: profile?.created_at ? new Date(profile.created_at).getFullYear().toString() : '2026',
@@ -49,6 +46,7 @@ export const authService = {
   setDemoMode: setDemoModeActive,
 
   async getCurrentUser(): Promise<User | null> {
+    // 1. Supabase Auth Session
     if (isSupabaseConfigured()) {
       const { data: { session }, error } = await supabase.auth.getSession();
       if (error || !session?.user) return null;
@@ -62,14 +60,26 @@ export const authService = {
       return mapProfileToUser(session.user, profile);
     }
 
-    if (isDemoModeActive()) {
-      return mockStore.getUser();
-    }
-
+    // 2. Token-gated session: If user has not signed in, ALWAYS return null (visitor state)
     const token = localStorage.getItem('shared_farm_token');
     if (!token) return null;
-    const res = await apiClient.get<User>('/auth/me');
-    return res.data;
+
+    if (isDemoModeActive()) {
+      const activeUser = mockStore.getActiveUser();
+      if (activeUser) return activeUser;
+      // If a legacy demo token is present, resolve corresponding demo user
+      if (token.includes('ramesh')) {
+        return mockStore.getUser();
+      }
+      return null;
+    }
+
+    try {
+      const res = await apiClient.get<User>('/auth/me');
+      return res.data;
+    } catch {
+      return null;
+    }
   },
 
   async login(email: string, password: string): Promise<User> {
@@ -96,9 +106,39 @@ export const authService = {
       return mapProfileToUser(data.user, profile);
     }
 
-    if (isDemoModeActive()) {
-      const user = mockStore.getUser();
-      localStorage.setItem('shared_farm_token', 'demo-jwt-token-ramesh-patel');
+    if (isDemoModeActive() || !isSupabaseConfigured()) {
+      // Check if logging into preloaded demo account
+      if (email.toLowerCase().includes('ramesh')) {
+        const user = mockStore.getUser();
+        mockStore.setActiveUser(user);
+        localStorage.setItem('shared_farm_token', 'demo-jwt-token-ramesh-patel');
+        return user;
+      }
+
+      // Check for previously registered active user in session
+      const existing = mockStore.getActiveUser();
+      if (existing && existing.email.toLowerCase() === email.toLowerCase()) {
+        localStorage.setItem('shared_farm_token', `demo-jwt-token-${existing.id}`);
+        return existing;
+      }
+
+      // Default demo login for custom credentials
+      const cleanName = email.split('@')[0] || 'Farmer';
+      const user: User = {
+        id: `usr-${Date.now()}`,
+        name: cleanName.charAt(0).toUpperCase() + cleanName.slice(1),
+        email,
+        phone: '+91 98000 00000',
+        location: { village: 'Farm Village', district: 'District', state: 'State' },
+        verificationStatus: 'verified',
+        memberSince: '2026',
+        preferredLanguage: 'English',
+        rating: 5.0,
+        reviewCount: 0,
+        role: 'user',
+      };
+      mockStore.setActiveUser(user);
+      localStorage.setItem('shared_farm_token', `demo-jwt-token-${user.id}`);
       return user;
     }
 
@@ -154,15 +194,17 @@ export const authService = {
       });
     }
 
-    if (isDemoModeActive()) {
-      const newUser = mockStore.updateUser({
+    if (isDemoModeActive() || !isSupabaseConfigured()) {
+      // Create fresh isolated user with brand new ID — NEVER reuses Ramesh or old records!
+      const newUser = mockStore.registerNewUser({
         name: userData.name || 'New Farmer',
-        email: userData.email || 'farmer@sharedfarm.demo',
+        email: userData.email || 'farmer@sharedfarm.local',
         phone: userData.phone || '+91 98000 00000',
-        location: userData.location || { village: 'Mogri', district: 'Anand', state: 'Gujarat' },
-        verificationStatus: 'pending',
+        location: userData.location || { village: '', district: '', state: '' },
+        preferredLanguage: userData.preferredLanguage || 'English',
+        avatar: undefined,
       });
-      localStorage.setItem('shared_farm_token', 'demo-jwt-token-new-farmer');
+      localStorage.setItem('shared_farm_token', `demo-jwt-token-${newUser.id}`);
       return newUser;
     }
 
@@ -173,9 +215,15 @@ export const authService = {
 
   async logout(): Promise<void> {
     if (isSupabaseConfigured()) {
-      await supabase.auth.signOut();
+      try {
+        await supabase.auth.signOut();
+      } catch (err) {
+        console.warn('Supabase signOut error:', err);
+      }
     }
     localStorage.removeItem('shared_farm_token');
+    mockStore.setActiveUser(null);
+    sessionStorage.removeItem('sf_active_user');
   },
 
   async updateProfile(userId: string, updates: Partial<User>): Promise<User> {

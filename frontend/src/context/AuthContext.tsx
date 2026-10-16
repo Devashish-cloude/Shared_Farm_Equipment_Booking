@@ -46,7 +46,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (session?.user) {
           const currentUser = await authService.getCurrentUser();
           setUser(currentUser);
-        } else if (!isDemoModeActive()) {
+        } else {
           setUser(null);
         }
       });
@@ -63,11 +63,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsDemoMode(nextVal);
     setDemoModeActive(nextVal);
     if (nextVal) {
-      setUser(mockStore.getUser());
-      toast.info('Switched to Demo Mode (using realistic local mock data)');
+      toast.info('Switched to Demo Mode');
     } else {
       setUser(null);
-      toast.info('Switched to Live Backend Mode (connecting to VITE_API_BASE_URL)');
+      toast.info('Switched to Live Backend Mode');
     }
   };
 

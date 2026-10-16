@@ -4,6 +4,7 @@ import { bookingsService } from '../../services/bookings.service';
 import { Booking } from '../../types';
 import { Button } from '../../components/ui/Button';
 import { formatCurrency, formatDate } from '../../lib/utils';
+import { resolveEquipmentImage } from '../../lib/equipmentImages';
 import {
   CheckCircle2,
   Calendar,
@@ -51,7 +52,7 @@ export const BookingConfirmationPage: React.FC = () => {
           <div className="p-4 bg-[#F7F8F2] rounded-2xl border border-[#E2E7DE] text-left space-y-3">
             <div className="flex items-center gap-3 pb-3 border-b border-[#E2E7DE]">
               <img
-                src={booking.equipmentImage || 'https://images.unsplash.com/photo-1592982537447-7440770cbfc9?w=150'}
+                src={resolveEquipmentImage(null, booking.equipmentImage, booking.equipmentCategory)}
                 alt={booking.equipmentName}
                 className="w-12 h-12 rounded-xl object-cover border border-[#E2E7DE]"
               />

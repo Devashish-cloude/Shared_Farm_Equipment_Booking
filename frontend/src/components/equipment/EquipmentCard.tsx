@@ -7,6 +7,8 @@ import { PriceDisplay } from '../ui/PriceDisplay';
 import { Button } from '../ui/Button';
 import { useLanguage } from '../../context/LanguageContext';
 import { MapPin, UserCheck, Zap, ArrowRight, ShieldCheck } from 'lucide-react';
+import { getEquipmentCategoryPlaceholder } from '../../lib/equipmentImages';
+import { getAvatarUrl } from '../../lib/avatar';
 
 interface EquipmentCardProps {
   equipment: Equipment;
@@ -17,7 +19,7 @@ export const EquipmentCard: React.FC<EquipmentCardProps> = ({ equipment, layout 
   const { t } = useLanguage();
   const [imgError, setImgError] = useState(false);
 
-  const fallbackImage = 'https://images.unsplash.com/photo-1592982537447-7440770cbfc9?w=600&auto=format&fit=crop&q=70';
+  const fallbackImage = getEquipmentCategoryPlaceholder(equipment.category);
 
   const getOptimizedImageUrl = (url?: string) => {
     if (!url) return fallbackImage;
@@ -161,7 +163,7 @@ export const EquipmentCard: React.FC<EquipmentCardProps> = ({ equipment, layout 
           <div className="mt-3 pt-3 border-t border-[#E2E7DE]/70 flex items-center justify-between text-xs text-[#526058]">
             <div className="flex items-center gap-2">
               <img
-                src={equipment.ownerAvatar || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80'}
+                src={getAvatarUrl(equipment.ownerAvatar, equipment.ownerName)}
                 alt={equipment.ownerName}
                 className="w-5 h-5 rounded-full object-cover ring-1 ring-[#CBD5C7]"
               />

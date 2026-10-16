@@ -5,6 +5,7 @@ import { Booking } from '../../types';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { Button } from '../../components/ui/Button';
 import { formatCurrency, formatDate } from '../../lib/utils';
+import { resolveEquipmentImage } from '../../lib/equipmentImages';
 import {
   Calendar,
   Clock,
@@ -93,7 +94,7 @@ export const BookingSummaryPage: React.FC = () => {
           {/* Equipment card */}
           <div className="bg-white p-5 rounded-2xl border border-[#E2E7DE] shadow-sm flex items-center gap-4">
             <img
-              src={booking.equipmentImage || 'https://images.unsplash.com/photo-1592982537447-7440770cbfc9?w=300'}
+              src={resolveEquipmentImage(null, booking.equipmentImage, booking.equipmentCategory)}
               alt={booking.equipmentName}
               className="w-20 h-20 rounded-xl object-cover border border-[#E2E7DE] shrink-0"
             />

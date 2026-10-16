@@ -4,7 +4,7 @@ import { authService } from '../services/auth.service';
 
 describe('Unified Single Farmer Account Architecture', () => {
   it('enforces ONE single account that both rents and lists machinery', async () => {
-    const user = await authService.getCurrentUser();
+    const user = await authService.login('ramesh.patel@sharedfarm.demo', 'demo');
     expect(user).toBeDefined();
     expect(user?.name).toBe('Ramesh Patel');
 

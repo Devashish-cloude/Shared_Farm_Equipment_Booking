@@ -15,6 +15,7 @@ import {
   Globe
 } from 'lucide-react';
 import { Button } from '../ui/Button';
+import { getAvatarUrl } from '../../lib/avatar';
 
 interface DashboardHeaderProps {
   onOpenMobileMenu: () => void;
@@ -65,7 +66,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({ onOpenMobileMe
             <span>{today}</span>
             <span className="hidden sm:inline">&bull;</span>
             <span className="hidden sm:inline text-[#347653] font-medium">
-              {user?.location?.village || 'Anand'}, {user?.location?.district || 'Gujarat'}
+              {user?.location?.village ? `${user.location.village}, ${user.location.district || ''}` : t('dash.verifiedCommunity')}
             </span>
           </div>
         </div>
@@ -165,7 +166,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({ onOpenMobileMe
             className="flex items-center gap-2 p-1.5 rounded-full border border-[#E2E7DE] hover:border-[#164B35] transition-all bg-white"
           >
             <img
-              src={user?.avatar || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100'}
+              src={getAvatarUrl(user?.avatar, user?.name)}
               alt={user?.name || 'User'}
               className="w-8 h-8 rounded-full object-cover ring-2 ring-[#B8D96B]"
             />

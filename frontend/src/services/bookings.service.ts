@@ -2,6 +2,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { mockStore } from './mockStore';
 import { isDemoModeActive } from './auth.service';
 import { Booking } from '../types';
+import { resolveEquipmentImage } from '../lib/equipmentImages';
 
 /**
  * Maps a Supabase booking row with nested equipment, renter, and owner profiles
@@ -12,9 +13,7 @@ export function mapSupabaseBooking(row: any): Booking {
   const renter = Array.isArray(row.renter) ? row.renter[0] : (row.renter || {});
   const owner = Array.isArray(row.owner) ? row.owner[0] : (row.owner || {});
   const eqImages = eq.images || eq.image_urls || [];
-  const primaryImage = Array.isArray(eqImages) && eqImages.length > 0
-    ? eqImages[0]
-    : 'https://images.unsplash.com/photo-1592982537447-7440770cbfc9?w=800';
+  const primaryImage = resolveEquipmentImage(eqImages, null, eq.category);
 
   return {
     id: row.id,
@@ -48,15 +47,17 @@ export function mapSupabaseBooking(row: any): Booking {
 }
 
 export const bookingsService = {
-  async getMyRentals(): Promise<Booking[]> {
+  async getMyRentals(renterId?: string): Promise<Booking[]> {
     if (isDemoModeActive() || !isSupabaseConfigured()) {
-      const user = mockStore.getUser();
-      return mockStore.getBookings().filter(b => b.renterId === user.id);
+      const user = mockStore.getActiveUser();
+      const targetId = renterId || user?.id;
+      if (!targetId) return [];
+      return mockStore.getBookings().filter(b => b.renterId === targetId);
     }
 
     try {
       const { data: sessionData } = await supabase.auth.getSession();
-      const userId = sessionData?.session?.user?.id;
+      const userId = renterId || sessionData?.session?.user?.id;
       if (!userId) return [];
 
       const { data, error } = await supabase
@@ -88,15 +89,17 @@ export const bookingsService = {
     }
   },
 
-  async getMyRequests(): Promise<Booking[]> {
+  async getMyRequests(ownerId?: string): Promise<Booking[]> {
     if (isDemoModeActive() || !isSupabaseConfigured()) {
-      const user = mockStore.getUser();
-      return mockStore.getBookings().filter(b => b.ownerId === user.id);
+      const user = mockStore.getActiveUser();
+      const targetId = ownerId || user?.id;
+      if (!targetId) return [];
+      return mockStore.getBookings().filter(b => b.ownerId === targetId);
     }
 
     try {
       const { data: sessionData } = await supabase.auth.getSession();
-      const userId = sessionData?.session?.user?.id;
+      const userId = ownerId || sessionData?.session?.user?.id;
       if (!userId) return [];
 
       const { data, error } = await supabase

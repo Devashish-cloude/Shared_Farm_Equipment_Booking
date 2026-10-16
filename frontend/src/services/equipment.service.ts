@@ -2,6 +2,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { mockStore } from './mockStore';
 import { isDemoModeActive } from './auth.service';
 import { Equipment, EquipmentCategory } from '../types';
+import { getEquipmentCategoryPlaceholder } from '../lib/equipmentImages';
 
 export interface EquipmentFilterParams {
   search?: string;
@@ -44,7 +45,7 @@ export function mapSupabaseEquipment(row: any): Equipment {
     operatorAvailable: Boolean(row.operator_available),
     operatorCostPerHour: Number(row.operator_cost_per_hour ?? 0),
     minRentalHours: Number(row.min_rental_hours ?? 1),
-    images: images.length > 0 ? images : ['https://images.unsplash.com/photo-1592982537447-7440770cbfc9?w=800&auto=format&fit=crop&q=80'],
+    images: images.length > 0 ? images : [getEquipmentCategoryPlaceholder(row.category)],
     location: {
       village: row.location_village || 'Mogri',
       district: row.location_district || 'Anand',
@@ -207,15 +208,17 @@ export const equipmentService = {
     }
   },
 
-  async getMyEquipment(): Promise<Equipment[]> {
+  async getMyEquipment(ownerId?: string): Promise<Equipment[]> {
     if (isDemoModeActive() || !isSupabaseConfigured()) {
-      const user = mockStore.getUser();
-      return mockStore.getEquipmentList().filter(e => e.ownerId === user.id);
+      const user = mockStore.getActiveUser();
+      const targetId = ownerId || user?.id;
+      if (!targetId) return [];
+      return mockStore.getEquipmentList().filter(e => e.ownerId === targetId);
     }
 
     try {
       const { data: sessionData } = await supabase.auth.getSession();
-      const userId = sessionData?.session?.user?.id;
+      const userId = ownerId || sessionData?.session?.user?.id;
       if (!userId) return [];
 
       const { data, error } = await supabase
@@ -243,7 +246,13 @@ export const equipmentService = {
 
   async create(data: Omit<Equipment, 'id' | 'createdAt' | 'rating' | 'reviewCount' | 'completedRentalsCount'>): Promise<Equipment> {
     if (isDemoModeActive() || !isSupabaseConfigured()) {
-      return mockStore.addEquipment(data);
+      const activeUser = mockStore.getActiveUser();
+      const payload = {
+        ...data,
+        ownerId: activeUser?.id || data.ownerId || 'usr-farmer',
+        ownerName: activeUser?.name || data.ownerName || 'Equipment Owner',
+      };
+      return mockStore.addEquipment(payload);
     }
 
     const { data: sessionData } = await supabase.auth.getSession();

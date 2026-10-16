@@ -6,6 +6,7 @@ import { BookingTimeline } from './BookingTimeline';
 import { Button } from '../ui/Button';
 import { useLanguage } from '../../context/LanguageContext';
 import { formatCurrency, formatDate } from '../../lib/utils';
+import { resolveEquipmentImage } from '../../lib/equipmentImages';
 import {
   Calendar,
   Clock,
@@ -64,7 +65,7 @@ export const BookingCard: React.FC<BookingCardProps> = ({
         {/* Machine info */}
         <div className="md:col-span-2 flex items-center gap-3">
           <img
-            src={booking.equipmentImage || 'https://images.unsplash.com/photo-1592982537447-7440770cbfc9?w=200'}
+            src={resolveEquipmentImage(null, booking.equipmentImage, booking.equipmentCategory)}
             alt={booking.equipmentName}
             className="w-16 h-16 rounded-xl object-cover shrink-0 border border-[#E2E7DE]"
           />

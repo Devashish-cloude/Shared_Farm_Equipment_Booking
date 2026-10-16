@@ -1,16 +1,19 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { Sprout, Eye, EyeOff, Lock, Mail, ArrowRight, Sparkles } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 
 export const LoginPage: React.FC = () => {
   const { login, isDemoMode } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [email, setEmail] = useState('ramesh.patel@sharedfarm.demo');
-  const [password, setPassword] = useState('demo-password-123');
+  // Clear by default so a real visitor is not forced into any previous user's credentials
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -25,7 +28,7 @@ export const LoginPage: React.FC = () => {
       await login(email, password);
       navigate(from, { replace: true });
     } catch (err: any) {
-      setError(err.message || 'Login failed. Please verify credentials.');
+      setError(err.message || t('auth.login.failed'));
     } finally {
       setIsLoading(false);
     }
@@ -38,6 +41,8 @@ export const LoginPage: React.FC = () => {
     try {
       await login('ramesh.patel@sharedfarm.demo', 'demo-farmer');
       navigate(from, { replace: true });
+    } catch (err: any) {
+      setError(err.message || t('auth.login.failed'));
     } finally {
       setIsLoading(false);
     }
@@ -52,22 +57,22 @@ export const LoginPage: React.FC = () => {
             <Sprout className="w-6 h-6 stroke-[2.5]" />
           </div>
           <h1 className="text-2xl font-extrabold font-heading text-[#164B35]">
-            Welcome Back to Shared Farm
+            {t('auth.login.title')}
           </h1>
           <p className="text-xs text-[#526058]">
-            Sign in to your unified farmer account to manage rentals &amp; listings
+            {t('auth.login.subtitle')}
           </p>
         </div>
 
-        {/* Demo Mode Notice & 1-Click Login */}
+        {/* Demo Mode Notice & 1-Click Login (Only displayed if demo mode is explicitly enabled) */}
         {isDemoMode && (
           <div className="bg-[#F0F5F2] border border-[#BCD3C6] p-3.5 rounded-2xl space-y-2">
             <div className="flex items-center gap-2 text-xs font-bold text-[#164B35]">
               <Sparkles className="w-4 h-4 text-[#347653]" />
-              <span>Interactive Demo Mode Active</span>
+              <span>{t('auth.login.demoNotice')}</span>
             </div>
             <p className="text-[11px] text-[#526058] leading-tight">
-              Preloaded with <strong>Ramesh Patel's</strong> sample farm account (has active rentals, listed tractors, and incoming requests).
+              {t('auth.login.demoDesc')}
             </p>
             <Button
               type="button"
@@ -77,7 +82,7 @@ export const LoginPage: React.FC = () => {
               onClick={handleQuickDemoLogin}
               isLoading={isLoading}
             >
-              1-Click Instant Demo Login
+              {t('auth.login.demoBtn')}
             </Button>
           </div>
         )}
@@ -92,7 +97,7 @@ export const LoginPage: React.FC = () => {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-xs font-bold text-[#25312A] mb-1.5">
-              Email or Mobile Number
+              {t('auth.login.emailLabel')}
             </label>
             <div className="relative">
               <Mail className="w-4 h-4 text-[#7C8C83] absolute left-3 top-3" />
@@ -101,7 +106,7 @@ export const LoginPage: React.FC = () => {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="name@example.com or +91..."
+                placeholder={t('auth.login.emailPlaceholder')}
                 className="w-full text-xs pl-9 pr-3 py-2.5 rounded-xl border border-[#CBD5C7] focus:outline-none focus:ring-2 focus:ring-[#164B35] bg-[#F7F8F2]/60 text-[#25312A]"
               />
             </div>
@@ -109,12 +114,14 @@ export const LoginPage: React.FC = () => {
 
           <div>
             <div className="flex justify-between items-center mb-1.5">
-              <label className="text-xs font-bold text-[#25312A]">Password</label>
+              <label className="text-xs font-bold text-[#25312A]">
+                {t('auth.login.passwordLabel')}
+              </label>
               <Link
                 to="/forgot-password"
                 className="text-[11px] font-semibold text-[#164B35] hover:underline"
               >
-                Forgot password?
+                {t('auth.login.forgotPassword')}
               </Link>
             </div>
             <div className="relative">
@@ -124,13 +131,14 @@ export const LoginPage: React.FC = () => {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter password"
+                placeholder={t('auth.login.passwordPlaceholder')}
                 className="w-full text-xs pl-9 pr-10 py-2.5 rounded-xl border border-[#CBD5C7] focus:outline-none focus:ring-2 focus:ring-[#164B35] bg-[#F7F8F2]/60 text-[#25312A]"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-3 top-3 text-[#7C8C83] hover:text-[#25312A]"
+                aria-label={showPassword ? t('auth.login.hidePassword') : t('auth.login.showPassword')}
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
@@ -145,16 +153,16 @@ export const LoginPage: React.FC = () => {
             isLoading={isLoading}
             rightIcon={<ArrowRight className="w-4 h-4" />}
           >
-            Sign In
+            {t('auth.login.submitBtn')}
           </Button>
         </form>
 
         {/* Footer */}
         <div className="text-center pt-2 border-t border-[#E2E7DE]">
           <p className="text-xs text-[#526058]">
-            Don't have an account yet?{' '}
+            {t('auth.login.noAccount')}{' '}
             <Link to="/register" className="font-bold text-[#164B35] hover:underline">
-              Create Free Account
+              {t('auth.login.registerLink')}
             </Link>
           </p>
         </div>

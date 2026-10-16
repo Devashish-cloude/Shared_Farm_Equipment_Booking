@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
+import { bookingsService } from '../../services/bookings.service';
+import { getAvatarUrl } from '../../lib/avatar';
 import {
   LayoutDashboard,
   Search,
@@ -19,7 +21,6 @@ import {
   X,
   ShieldAlert
 } from 'lucide-react';
-import { mockStore } from '../../services/mockStore';
 
 interface DashboardSidebarProps {
   onCloseMobile?: () => void;
@@ -29,16 +30,39 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ onCloseMobil
   const { user } = useAuth();
   const { t } = useLanguage();
 
-  // Dynamic counts for badges
-  const pendingRequestsCount = mockStore
-    .getBookings()
-    .filter(b => b.ownerId === user?.id && b.status === 'pending').length;
+  const [activeRentalsCount, setActiveRentalsCount] = useState(0);
+  const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
+  const [unreadNotifsCount, setUnreadNotifsCount] = useState(0);
 
-  const activeRentalsCount = mockStore
-    .getBookings()
-    .filter(b => b.renterId === user?.id && b.status === 'active').length;
-
-  const unreadNotifsCount = mockStore.getNotifications().filter(n => !n.read).length;
+  useEffect(() => {
+    let isMounted = true;
+    const loadCounts = async () => {
+      if (!user) {
+        if (isMounted) {
+          setActiveRentalsCount(0);
+          setPendingRequestsCount(0);
+          setUnreadNotifsCount(0);
+        }
+        return;
+      }
+      try {
+        const [rentals, requests] = await Promise.all([
+          bookingsService.getMyRentals().catch(() => []),
+          bookingsService.getMyRequests().catch(() => []),
+        ]);
+        if (isMounted) {
+          setActiveRentalsCount(rentals.filter((b) => b.status === 'active').length);
+          setPendingRequestsCount(requests.filter((b) => b.status === 'pending').length);
+        }
+      } catch {
+        // Keep zeros on failure
+      }
+    };
+    loadCounts();
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.id]);
 
   const navItems = [
     {
@@ -207,7 +231,7 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ onCloseMobil
             className="flex items-center gap-3 group"
           >
             <img
-              src={user.avatar || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100'}
+              src={getAvatarUrl(user.avatar, user.name)}
               alt={user.name}
               className="w-9 h-9 rounded-full object-cover ring-2 ring-[#B8D96B]"
             />
@@ -216,7 +240,7 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ onCloseMobil
                 {user.name}
               </p>
               <p className="text-[11px] text-[#526058] truncate">
-                {user.location.village}, {user.location.district}
+                {user.location?.village ? `${user.location.village}, ${user.location.district || ''}` : 'Farmer'}
               </p>
             </div>
           </Link>

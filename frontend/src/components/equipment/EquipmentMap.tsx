@@ -6,6 +6,7 @@ import { PriceDisplay } from '../ui/PriceDisplay';
 import { StatusBadge } from '../ui/StatusBadge';
 import { Link } from 'react-router-dom';
 import { ArrowRight, MapPin } from 'lucide-react';
+import { resolveEquipmentImage } from '../../lib/equipmentImages';
 
 interface EquipmentMapProps {
   equipmentList: Equipment[];
@@ -73,7 +74,7 @@ export const EquipmentMap: React.FC<EquipmentMapProps> = ({
               <Popup className="custom-equipment-popup">
                 <div className="p-1 max-w-[220px]">
                   <img
-                    src={eq.images[0] || 'https://images.unsplash.com/photo-1592982537447-7440770cbfc9?w=300'}
+                    src={resolveEquipmentImage(eq.images, null, eq.category)}
                     alt={eq.title}
                     className="w-full h-24 object-cover rounded-lg mb-2"
                   />

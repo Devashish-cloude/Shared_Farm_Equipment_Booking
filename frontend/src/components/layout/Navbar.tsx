@@ -18,6 +18,7 @@ import {
   Check,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
+import { getAvatarUrl } from '../../lib/avatar';
 
 export const Navbar: React.FC = () => {
   const { user, isAuthenticated, logout } = useAuth();
@@ -146,7 +147,7 @@ export const Navbar: React.FC = () => {
                     className="flex items-center gap-2.5 p-1.5 pr-3 rounded-full border border-[#E2E7DE] hover:border-[#164B35] bg-white transition-all shadow-xs"
                   >
                     <img
-                      src={user.avatar || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100'}
+                      src={getAvatarUrl(user.avatar, user.name)}
                       alt={user.name}
                       className="w-8 h-8 rounded-full object-cover ring-2 ring-[#B8D96B]"
                     />
@@ -308,7 +309,7 @@ export const Navbar: React.FC = () => {
               <div className="space-y-3">
                 <div className="flex items-center gap-3 px-3 py-2 bg-[#F7F8F2] rounded-xl">
                   <img
-                    src={user.avatar || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100'}
+                    src={getAvatarUrl(user.avatar, user.name)}
                     alt={user.name}
                     className="w-10 h-10 rounded-full object-cover"
                   />

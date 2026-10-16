@@ -1,45 +1,62 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { Sprout, Lock, Mail, User, Phone, MapPin, ArrowRight, ShieldCheck, Eye, EyeOff } from 'lucide-react';
+import { useLanguage } from '../../context/LanguageContext';
+import { INDIAN_STATES_DISTRICTS } from '../../lib/indianLocations';
+import { Sprout, Lock, Mail, User, Phone, MapPin, ArrowRight, Eye, EyeOff } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 
 export const RegisterPage: React.FC = () => {
   const { register } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
+
+  const states = Object.keys(INDIAN_STATES_DISTRICTS);
+  const defaultState = states[0] || 'Maharashtra';
 
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     phone: '',
     village: '',
-    district: '',
-    state: 'Gujarat',
+    district: INDIAN_STATES_DISTRICTS[defaultState]?.[0] || 'Pune',
+    state: defaultState,
     password: '',
     confirmPassword: '',
-    agreed: true,
+    agreed: false,
   });
 
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const availableDistricts = INDIAN_STATES_DISTRICTS[formData.state] || [];
+
+  const handleStateChange = (newState: string) => {
+    const districtsForNewState = INDIAN_STATES_DISTRICTS[newState] || [];
+    setFormData((prev) => ({
+      ...prev,
+      state: newState,
+      district: districtsForNewState[0] || '',
+    }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
     if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters long.');
+      setError(t('auth.register.passMinLength'));
       return;
     }
 
     if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match.');
+      setError(t('auth.register.passMismatch'));
       return;
     }
 
     if (!formData.agreed) {
-      setError('Please agree to the platform community guidelines and terms.');
+      setError(t('auth.register.agreeRequired'));
       return;
     }
 
@@ -58,7 +75,7 @@ export const RegisterPage: React.FC = () => {
       });
       navigate('/dashboard');
     } catch (err: any) {
-      setError(err.message || 'Registration failed.');
+      setError(err.message || t('auth.register.failed'));
     } finally {
       setIsLoading(false);
     }
@@ -73,10 +90,10 @@ export const RegisterPage: React.FC = () => {
             <Sprout className="w-6 h-6 stroke-[2.5]" />
           </div>
           <h1 className="text-2xl font-extrabold font-heading text-[#164B35]">
-            Create Unified Farmer Account
+            {t('auth.register.title')}
           </h1>
           <p className="text-xs text-[#526058] max-w-md mx-auto">
-            One account to both <strong>rent equipment from neighbors</strong> and <strong>list your own machinery</strong> for extra income.
+            {t('auth.register.subtitle')}
           </p>
         </div>
 
@@ -89,7 +106,9 @@ export const RegisterPage: React.FC = () => {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold text-[#25312A] mb-1.5">Full Name *</label>
+              <label className="block text-xs font-bold text-[#25312A] mb-1.5">
+                {t('auth.register.fullName')}
+              </label>
               <div className="relative">
                 <User className="w-4 h-4 text-[#7C8C83] absolute left-3 top-3" />
                 <input
@@ -97,14 +116,16 @@ export const RegisterPage: React.FC = () => {
                   required
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="e.g. Ramesh Patel"
+                  placeholder={t('auth.register.fullNamePlaceholder')}
                   className="w-full text-xs pl-9 pr-3 py-2.5 rounded-xl border border-[#CBD5C7] focus:outline-none focus:ring-2 focus:ring-[#164B35] bg-[#F7F8F2]/60 text-[#25312A]"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-[#25312A] mb-1.5">Mobile Phone *</label>
+              <label className="block text-xs font-bold text-[#25312A] mb-1.5">
+                {t('auth.register.phone')}
+              </label>
               <div className="relative">
                 <Phone className="w-4 h-4 text-[#7C8C83] absolute left-3 top-3" />
                 <input
@@ -112,14 +133,16 @@ export const RegisterPage: React.FC = () => {
                   required
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  placeholder="+91 98..."
+                  placeholder={t('auth.register.phonePlaceholder')}
                   className="w-full text-xs pl-9 pr-3 py-2.5 rounded-xl border border-[#CBD5C7] focus:outline-none focus:ring-2 focus:ring-[#164B35] bg-[#F7F8F2]/60 text-[#25312A]"
                 />
               </div>
             </div>
 
             <div className="sm:col-span-2">
-              <label className="block text-xs font-bold text-[#25312A] mb-1.5">Email Address *</label>
+              <label className="block text-xs font-bold text-[#25312A] mb-1.5">
+                {t('auth.register.email')}
+              </label>
               <div className="relative">
                 <Mail className="w-4 h-4 text-[#7C8C83] absolute left-3 top-3" />
                 <input
@@ -127,7 +150,7 @@ export const RegisterPage: React.FC = () => {
                   required
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder="farmer@example.com"
+                  placeholder={t('auth.register.emailPlaceholder')}
                   className="w-full text-xs pl-9 pr-3 py-2.5 rounded-xl border border-[#CBD5C7] focus:outline-none focus:ring-2 focus:ring-[#164B35] bg-[#F7F8F2]/60 text-[#25312A]"
                 />
               </div>
@@ -135,7 +158,43 @@ export const RegisterPage: React.FC = () => {
 
             {/* Farm Location */}
             <div>
-              <label className="block text-xs font-bold text-[#25312A] mb-1.5">Village / Town *</label>
+              <label className="block text-xs font-bold text-[#25312A] mb-1.5">
+                {t('auth.register.state')}
+              </label>
+              <select
+                value={formData.state}
+                onChange={(e) => handleStateChange(e.target.value)}
+                className="w-full text-xs px-3 py-2.5 rounded-xl border border-[#CBD5C7] focus:outline-none focus:ring-2 focus:ring-[#164B35] bg-[#F7F8F2]/60 text-[#25312A]"
+              >
+                {states.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-[#25312A] mb-1.5">
+                {t('auth.register.district')}
+              </label>
+              <select
+                value={formData.district}
+                onChange={(e) => setFormData({ ...formData, district: e.target.value })}
+                className="w-full text-xs px-3 py-2.5 rounded-xl border border-[#CBD5C7] focus:outline-none focus:ring-2 focus:ring-[#164B35] bg-[#F7F8F2]/60 text-[#25312A]"
+              >
+                {availableDistricts.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-bold text-[#25312A] mb-1.5">
+                {t('auth.register.village')}
+              </label>
               <div className="relative">
                 <MapPin className="w-4 h-4 text-[#7C8C83] absolute left-3 top-3" />
                 <input
@@ -143,27 +202,17 @@ export const RegisterPage: React.FC = () => {
                   required
                   value={formData.village}
                   onChange={(e) => setFormData({ ...formData, village: e.target.value })}
-                  placeholder="e.g. Mogri"
+                  placeholder={t('auth.register.villagePlaceholder')}
                   className="w-full text-xs pl-9 pr-3 py-2.5 rounded-xl border border-[#CBD5C7] focus:outline-none focus:ring-2 focus:ring-[#164B35] bg-[#F7F8F2]/60 text-[#25312A]"
                 />
               </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-[#25312A] mb-1.5">District &amp; State *</label>
-              <input
-                type="text"
-                required
-                value={formData.district}
-                onChange={(e) => setFormData({ ...formData, district: e.target.value })}
-                placeholder="e.g. Anand, Gujarat"
-                className="w-full text-xs px-3 py-2.5 rounded-xl border border-[#CBD5C7] focus:outline-none focus:ring-2 focus:ring-[#164B35] bg-[#F7F8F2]/60 text-[#25312A]"
-              />
-            </div>
-
             {/* Password */}
             <div>
-              <label className="block text-xs font-bold text-[#25312A] mb-1.5">Password *</label>
+              <label className="block text-xs font-bold text-[#25312A] mb-1.5">
+                {t('auth.register.password')}
+              </label>
               <div className="relative">
                 <Lock className="w-4 h-4 text-[#7C8C83] absolute left-3 top-3" />
                 <input
@@ -171,7 +220,7 @@ export const RegisterPage: React.FC = () => {
                   required
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  placeholder="At least 6 chars"
+                  placeholder={t('auth.register.passwordPlaceholder')}
                   className="w-full text-xs pl-9 pr-10 py-2.5 rounded-xl border border-[#CBD5C7] focus:outline-none focus:ring-2 focus:ring-[#164B35] bg-[#F7F8F2]/60 text-[#25312A]"
                 />
                 <button
@@ -185,7 +234,9 @@ export const RegisterPage: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-[#25312A] mb-1.5">Confirm Password *</label>
+              <label className="block text-xs font-bold text-[#25312A] mb-1.5">
+                {t('auth.register.confirmPassword')}
+              </label>
               <div className="relative">
                 <Lock className="w-4 h-4 text-[#7C8C83] absolute left-3 top-3" />
                 <input
@@ -193,7 +244,7 @@ export const RegisterPage: React.FC = () => {
                   required
                   value={formData.confirmPassword}
                   onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                  placeholder="Re-enter password"
+                  placeholder={t('auth.register.confirmPasswordPlaceholder')}
                   className="w-full text-xs pl-9 pr-3 py-2.5 rounded-xl border border-[#CBD5C7] focus:outline-none focus:ring-2 focus:ring-[#164B35] bg-[#F7F8F2]/60 text-[#25312A]"
                 />
               </div>
@@ -209,7 +260,7 @@ export const RegisterPage: React.FC = () => {
                 className="w-4 h-4 rounded text-[#164B35] focus:ring-[#164B35] mt-0.5 accent-[#164B35]"
               />
               <span>
-                I agree to the peer-to-peer machinery sharing terms, safety protocols, and escrow deposit guidelines.
+                {t('auth.register.terms')}
               </span>
             </label>
           </div>
@@ -222,15 +273,15 @@ export const RegisterPage: React.FC = () => {
             isLoading={isLoading}
             rightIcon={<ArrowRight className="w-4 h-4" />}
           >
-            Create Farmer Account
+            {t('auth.register.submitBtn')}
           </Button>
         </form>
 
         <div className="text-center pt-2 border-t border-[#E2E7DE]">
           <p className="text-xs text-[#526058]">
-            Already have an account?{' '}
+            {t('auth.register.alreadyAccount')}{' '}
             <Link to="/login" className="font-bold text-[#164B35] hover:underline">
-              Sign In Here
+              {t('auth.register.loginLink')}
             </Link>
           </p>
         </div>

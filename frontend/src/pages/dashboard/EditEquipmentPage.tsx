@@ -4,11 +4,13 @@ import { equipmentService } from '../../services/equipment.service';
 import { EquipmentForm } from '../../components/forms/EquipmentForm';
 import { Equipment } from '../../types';
 import { ChevronLeft } from 'lucide-react';
+import { useLanguage } from '../../context/LanguageContext';
 import { toast } from 'sonner';
 
 export const EditEquipmentPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const [equipment, setEquipment] = useState<Equipment | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -46,7 +48,7 @@ export const EditEquipmentPage: React.FC = () => {
     return (
       <div className="max-w-4xl mx-auto py-16 text-center text-[#526058]">
         <div className="w-8 h-8 border-3 border-[#164B35] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-        <p className="text-xs">Loading equipment listing...</p>
+        <p className="text-xs">{t('common.loading')}</p>
       </div>
     );
   }
@@ -54,7 +56,7 @@ export const EditEquipmentPage: React.FC = () => {
   if (!equipment) {
     return (
       <div className="max-w-4xl mx-auto py-16 text-center">
-        <h2 className="text-xl font-bold text-[#164B35]">Listing Not Found</h2>
+        <h2 className="text-xl font-bold text-[#164B35]">{t('common.noResults')}</h2>
       </div>
     );
   }
@@ -67,16 +69,16 @@ export const EditEquipmentPage: React.FC = () => {
           className="flex items-center gap-1.5 text-xs font-bold text-[#164B35] hover:underline"
         >
           <ChevronLeft className="w-4 h-4" />
-          <span>Back to My Equipment</span>
+          <span>{t('equip.title')}</span>
         </button>
       </div>
 
       <div className="pb-3 border-b border-[#E2E7DE]">
         <h1 className="text-2xl font-extrabold text-[#164B35] font-heading">
-          Edit Equipment Listing
+          {t('equipForm.submitUpdate')}
         </h1>
         <p className="text-xs text-[#526058]">
-          Update rates, specifications, driver availability, or photos for {equipment.title}
+          {equipment.title}
         </p>
       </div>
 

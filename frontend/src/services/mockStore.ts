@@ -72,15 +72,59 @@ class MockDataStore {
     sessionStorage.clear();
   }
 
-  // User
+  // Active User Session Management (Ensures account isolation)
+  public getActiveUser(): User | null {
+    const raw = sessionStorage.getItem('sf_active_user');
+    if (raw) {
+      try {
+        return JSON.parse(raw);
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
+
+  public setActiveUser(user: User | null): void {
+    if (user) {
+      sessionStorage.setItem('sf_active_user', JSON.stringify(user));
+    } else {
+      sessionStorage.removeItem('sf_active_user');
+    }
+  }
+
+  public registerNewUser(data: Partial<User>): User {
+    const newUser: User = {
+      id: data.id || `usr-farmer-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      name: data.name || 'New Farmer',
+      email: data.email || 'farmer@sharedfarm.local',
+      phone: data.phone || '',
+      avatar: data.avatar || '',
+      location: data.location || { village: '', district: '', state: '' },
+      verificationStatus: 'unverified',
+      memberSince: new Date().getFullYear().toString(),
+      preferredLanguage: data.preferredLanguage || 'English',
+      rating: 5.0,
+      reviewCount: 0,
+      role: 'user',
+      farmDetails: data.farmDetails || { farmSizeAcres: undefined, primaryCrops: [] },
+    };
+    this.setActiveUser(newUser);
+    return newUser;
+  }
+
+  // User (Legacy fallback)
   public getUser(): User {
-    return this.user;
+    return this.getActiveUser() || this.user;
   }
 
   public updateUser(updates: Partial<User>): User {
-    this.user = { ...this.user, ...updates };
-    this.save(STORAGE_KEYS.USER, this.user);
-    return this.user;
+    const current = this.getActiveUser() || this.user;
+    const updated = { ...current, ...updates };
+    this.setActiveUser(updated);
+    this.user = updated;
+    this.save(STORAGE_KEYS.USER, updated);
+    return updated;
   }
 
   // Equipment
@@ -95,7 +139,7 @@ class MockDataStore {
   public addEquipment(item: Omit<Equipment, 'id' | 'createdAt' | 'rating' | 'reviewCount' | 'completedRentalsCount'>): Equipment {
     const newEquip: Equipment = {
       ...item,
-      id: `eq-${Date.now()}`,
+      id: `eq-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       createdAt: new Date().toISOString(),
       rating: 5.0,
       reviewCount: 0,

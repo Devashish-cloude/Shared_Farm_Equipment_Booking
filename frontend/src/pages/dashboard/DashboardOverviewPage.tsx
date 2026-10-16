@@ -2,10 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
-import { mockStore } from '../../services/mockStore';
+import { bookingsService } from '../../services/bookings.service';
+import { equipmentService } from '../../services/equipment.service';
+import { paymentsService } from '../../services/payments.service';
 import { formatCurrency, formatDate } from '../../lib/utils';
+import { resolveEquipmentImage } from '../../lib/equipmentImages';
 import { Button } from '../../components/ui/Button';
 import { StatusBadge } from '../../components/ui/StatusBadge';
+import { Booking, Equipment, Transaction } from '../../types';
 import {
   KeyRound,
   Tractor,
@@ -15,12 +19,10 @@ import {
   PlusCircle,
   Navigation,
   ArrowRight,
-  Clock,
-  CheckCircle2,
   Calendar,
-  AlertCircle,
   TrendingUp,
-  Activity
+  Clock,
+  Sparkles
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -36,28 +38,66 @@ export const DashboardOverviewPage: React.FC = () => {
   const { user } = useAuth();
   const { t } = useLanguage();
 
-  // Metrics from mockStore
-  const allBookings = mockStore.getBookings();
-  const myRentals = allBookings.filter((b) => b.renterId === user?.id);
-  const activeRentals = myRentals.filter((b) => b.status === 'active');
-  const upcomingRentals = myRentals.filter((b) => b.status === 'accepted' || b.status === 'pending');
+  const [rentals, setRentals] = useState<Booking[]>([]);
+  const [requests, setRequests] = useState<Booking[]>([]);
+  const [equipment, setEquipment] = useState<Equipment[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  const myListings = mockStore.getEquipmentList().filter((e) => e.ownerId === user?.id);
-  const pendingRequests = allBookings.filter((b) => b.ownerId === user?.id && b.status === 'pending');
+  useEffect(() => {
+    let isMounted = true;
+    const fetchDashboardData = async () => {
+      if (!user) {
+        setIsLoading(false);
+        return;
+      }
+      setIsLoading(true);
+      try {
+        const [myRentalsData, myRequestsData, myEquipmentData, transactionsData] = await Promise.all([
+          bookingsService.getMyRentals().catch(() => []),
+          bookingsService.getMyRequests().catch(() => []),
+          equipmentService.getMyEquipment().catch(() => []),
+          paymentsService.getTransactions().catch(() => []),
+        ]);
 
-  const transactions = mockStore.getTransactions();
+        if (isMounted) {
+          setRentals(myRentalsData);
+          setRequests(myRequestsData);
+          setEquipment(myEquipmentData);
+          setTransactions(transactionsData);
+        }
+      } catch (err) {
+        console.error('Failed to load dashboard data:', err);
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.id]);
+
+  const activeRentals = rentals.filter((b) => b.status === 'active');
+  const upcomingRentals = rentals.filter((b) => b.status === 'accepted' || b.status === 'pending');
+  const pendingRequests = requests.filter((b) => b.status === 'pending');
   const netEarnings = transactions
-    .filter((t) => t.type === 'earning')
-    .reduce((sum, t) => sum + t.netAmount, 0);
+    .filter((tx) => tx.type === 'earning')
+    .reduce((sum, tx) => sum + tx.netAmount, 0);
 
-  // Sample analytics data for Recharts
+  // Dynamic or fallback analytics chart data
   const chartData = [
-    { month: 'Sep', rentalHours: 14, earnings: 4200 },
-    { month: 'Oct', rentalHours: 28, earnings: 8900 },
-    { month: 'Nov', rentalHours: 36, earnings: 11400 },
-    { month: 'Dec', rentalHours: 22, earnings: 6800 },
-    { month: 'Jan', rentalHours: 32, earnings: 9248 },
+    { month: 'Sep', rentalHours: equipment.length > 0 ? 14 : 0, earnings: equipment.length > 0 ? 4200 : 0 },
+    { month: 'Oct', rentalHours: equipment.length > 0 ? 28 : 0, earnings: equipment.length > 0 ? 8900 : 0 },
+    { month: 'Nov', rentalHours: equipment.length > 0 ? 36 : 0, earnings: equipment.length > 0 ? 11400 : 0 },
+    { month: 'Dec', rentalHours: equipment.length > 0 ? 22 : 0, earnings: equipment.length > 0 ? 6800 : 0 },
+    { month: 'Jan', rentalHours: activeRentals.length * 8, earnings: netEarnings },
   ];
+
+  const userLocationStr = [user?.location?.village, user?.location?.district, user?.location?.state]
+    .filter(Boolean)
+    .join(', ');
 
   return (
     <div className="space-y-8">
@@ -69,10 +109,11 @@ export const DashboardOverviewPage: React.FC = () => {
               {t('overview.singleAccount')}
             </span>
             <h1 className="text-2xl sm:text-3xl font-extrabold font-heading">
-              {t('overview.welcome')}, {user?.name}!
+              {t('overview.welcome')}, {user?.name || t('dash.farmer')}!
             </h1>
             <p className="text-xs text-[#DCE8E2] mt-1">
-              {t('overview.farmLocation')}: {user?.location?.village || 'Anand'}, {user?.location?.district || 'Gujarat'} &bull; {user?.farmDetails?.farmSizeAcres || 18} {t('overview.acres')}
+              {userLocationStr ? `${t('overview.farmLocation')}: ${userLocationStr}` : t('dash.verifiedCommunity')}
+              {user?.farmDetails?.farmSizeAcres ? ` • ${user.farmDetails.farmSizeAcres} ${t('overview.acres')}` : ''}
             </p>
           </div>
 
@@ -121,7 +162,7 @@ export const DashboardOverviewPage: React.FC = () => {
           <p className="text-xs text-[#7C8C83] font-medium">{t('overview.activeRentals')}</p>
           <div className="flex items-baseline gap-2 mt-1">
             <h3 className="text-2xl font-extrabold font-heading text-[#25312A]">
-              {activeRentals.length}
+              {isLoading ? '...' : activeRentals.length}
             </h3>
             <span className="text-xs text-[#526058]">{t('overview.inFieldNow')}</span>
           </div>
@@ -143,7 +184,7 @@ export const DashboardOverviewPage: React.FC = () => {
           <p className="text-xs text-[#7C8C83] font-medium">{t('overview.myListedMachinery')}</p>
           <div className="flex items-baseline gap-2 mt-1">
             <h3 className="text-2xl font-extrabold font-heading text-[#25312A]">
-              {myListings.length}
+              {isLoading ? '...' : equipment.length}
             </h3>
             <span className="text-xs text-[#526058]">{t('overview.activeImplements')}</span>
           </div>
@@ -167,7 +208,7 @@ export const DashboardOverviewPage: React.FC = () => {
           <p className="text-xs text-[#7C8C83] font-medium">{t('overview.pendingRequests')}</p>
           <div className="flex items-baseline gap-2 mt-1">
             <h3 className="text-2xl font-extrabold font-heading text-[#25312A]">
-              {pendingRequests.length}
+              {isLoading ? '...' : pendingRequests.length}
             </h3>
             <span className="text-xs text-[#526058]">{t('overview.incomingRequests')}</span>
           </div>
@@ -189,13 +230,13 @@ export const DashboardOverviewPage: React.FC = () => {
           <p className="text-xs text-[#7C8C83] font-medium">{t('overview.netEarnings')}</p>
           <div className="flex items-baseline gap-2 mt-1">
             <h3 className="text-2xl font-extrabold font-heading text-[#164B35]">
-              {formatCurrency(netEarnings)}
+              {isLoading ? '...' : formatCurrency(netEarnings)}
             </h3>
           </div>
         </Link>
       </div>
 
-      {/* 3. Urgent Activity Alerts (Pending Requests or Live Telemetry) */}
+      {/* 3. Urgent Activity Alerts (Live Telemetry) */}
       {activeRentals.length > 0 && (
         <div className="bg-blue-50 border border-blue-200 p-5 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -219,7 +260,7 @@ export const DashboardOverviewPage: React.FC = () => {
         </div>
       )}
 
-      {/* 4. Activity Columns: Upcoming Rentals (Renting) & Incoming Requests (Sharing) */}
+      {/* 4. Activity Columns: Upcoming Rentals & Incoming Requests */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Left Column: My Rentals (Renting) */}
         <div className="bg-white p-6 rounded-3xl border border-[#E2E7DE] shadow-sm space-y-4">
@@ -240,9 +281,16 @@ export const DashboardOverviewPage: React.FC = () => {
           </div>
 
           {upcomingRentals.length === 0 && activeRentals.length === 0 ? (
-            <p className="text-xs text-[#7C8C83] py-6 text-center">
-              {t('overview.noRentals')}
-            </p>
+            <div className="py-8 text-center space-y-3">
+              <p className="text-xs text-[#7C8C83]">
+                {t('overview.noRentals')}
+              </p>
+              <Link to="/equipment">
+                <Button variant="outline" size="sm" className="text-xs">
+                  {t('overview.findRent')}
+                </Button>
+              </Link>
+            </div>
           ) : (
             <div className="space-y-3">
               {[...activeRentals, ...upcomingRentals].slice(0, 3).map((bk) => (
@@ -252,7 +300,7 @@ export const DashboardOverviewPage: React.FC = () => {
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <img
-                      src={bk.equipmentImage}
+                      src={resolveEquipmentImage(null, bk.equipmentImage, bk.equipmentCategory)}
                       alt={bk.equipmentName}
                       className="w-12 h-12 rounded-lg object-cover shrink-0"
                     />
@@ -299,9 +347,20 @@ export const DashboardOverviewPage: React.FC = () => {
           </div>
 
           {pendingRequests.length === 0 ? (
-            <p className="text-xs text-[#7C8C83] py-6 text-center">
-              No pending booking requests right now. Your machinery is ready for new dates!
-            </p>
+            <div className="py-8 text-center space-y-3">
+              <p className="text-xs text-[#7C8C83]">
+                {equipment.length === 0
+                  ? 'No equipment listed yet. List your machinery to earn rental income!'
+                  : 'No pending booking requests right now. Your machinery is ready for new dates!'}
+              </p>
+              {equipment.length === 0 && (
+                <Link to="/dashboard/equipment/new">
+                  <Button variant="outline" size="sm" className="text-xs">
+                    {t('overview.listShare')}
+                  </Button>
+                </Link>
+              )}
+            </div>
           ) : (
             <div className="space-y-3">
               {pendingRequests.slice(0, 3).map((req) => (
@@ -312,7 +371,9 @@ export const DashboardOverviewPage: React.FC = () => {
                   <div className="min-w-0 space-y-1">
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-bold text-[#25312A]">{req.renterName}</span>
-                      <span className="text-[10px] text-[#7C8C83]">({req.renterVillage})</span>
+                      {req.renterVillage && (
+                        <span className="text-[10px] text-[#7C8C83]">({req.renterVillage})</span>
+                      )}
                     </div>
                     <p className="text-xs text-[#526058] truncate">
                       Requested: <strong>{req.equipmentName}</strong>
@@ -345,7 +406,7 @@ export const DashboardOverviewPage: React.FC = () => {
           </div>
           <div className="flex items-center gap-2 text-xs font-semibold text-[#164B35]">
             <TrendingUp className="w-4 h-4" />
-            <span>+34% Utilization</span>
+            <span>{equipment.length > 0 ? '+34% Utilization' : 'Ready to start'}</span>
           </div>
         </div>
 

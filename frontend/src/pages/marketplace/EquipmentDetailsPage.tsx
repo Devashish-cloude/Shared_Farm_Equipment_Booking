@@ -7,6 +7,7 @@ import { useAuth } from '../../context/AuthContext';
 import { Equipment, Review } from '../../types';
 import { RatingDisplay } from '../../components/ui/RatingDisplay';
 import { StatusBadge } from '../../components/ui/StatusBadge';
+import { getAvatarUrl } from '../../lib/avatar';
 import { PriceDisplay } from '../../components/ui/PriceDisplay';
 import { Button } from '../../components/ui/Button';
 import { formatCurrency, formatDate } from '../../lib/utils';
@@ -283,7 +284,7 @@ export const EquipmentDetailsPage: React.FC = () => {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <img
-                  src={equipment.ownerAvatar || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120'}
+                  src={getAvatarUrl(equipment.ownerAvatar, equipment.ownerName)}
                   alt={equipment.ownerName}
                   className="w-12 h-12 rounded-full object-cover ring-2 ring-[#B8D96B]"
                 />
@@ -329,7 +330,7 @@ export const EquipmentDetailsPage: React.FC = () => {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <img
-                          src={rev.reviewerAvatar || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80'}
+                          src={getAvatarUrl(rev.reviewerAvatar, rev.reviewerName)}
                           alt={rev.reviewerName}
                           className="w-7 h-7 rounded-full object-cover"
                         />
