@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { Sparkles, RefreshCw, Server, Info, X } from 'lucide-react';
 import { Button } from './Button';
 
 export const DemoModeBanner: React.FC = () => {
   const { isDemoMode, toggleDemoMode, resetDemoData, user } = useAuth();
+  const { t } = useLanguage();
   const [showInfo, setShowInfo] = useState(false);
 
   return (
@@ -13,11 +15,11 @@ export const DemoModeBanner: React.FC = () => {
         <div className="flex items-center gap-2">
           <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#B8D96B] text-[#164B35] font-bold tracking-wide uppercase text-[10px]">
             <Sparkles className="w-3 h-3" />
-            {isDemoMode ? 'Interactive Demo Mode' : 'Live Backend Mode'}
+            {isDemoMode ? t('demo.banner') : 'Live Backend Mode'}
           </span>
           <span className="text-[#DCE8E2] hidden sm:inline">
             {isDemoMode
-              ? `Logged in as ${user?.name || 'Ramesh Patel'} (Unified Single Account: Rent & List)`
+              ? `${t('demo.loggedInAs')} ${user?.name || 'Ramesh Patel'} (${t('demo.unifiedAccount')})`
               : 'Connected to API endpoint'}
           </span>
         </div>
@@ -39,7 +41,7 @@ export const DemoModeBanner: React.FC = () => {
               title="Reset sample equipment and rentals to initial state"
             >
               <RefreshCw className="w-3 h-3" />
-              <span>Reset Data</span>
+              <span>{t('demo.reset')}</span>
             </button>
           )}
 
@@ -48,7 +50,7 @@ export const DemoModeBanner: React.FC = () => {
             className="flex items-center gap-1 px-2.5 py-1 rounded bg-[#347653] hover:bg-[#235D40] text-white transition-colors border border-[#4C926D]"
           >
             <Server className="w-3 h-3" />
-            <span>Switch to {isDemoMode ? 'API Mode' : 'Demo Mode'}</span>
+            <span>{isDemoMode ? t('demo.switchApi') : 'Demo Mode'}</span>
           </button>
         </div>
       </div>

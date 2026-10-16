@@ -19,10 +19,12 @@ import {
 import { Button } from '../components/ui/Button';
 import { EquipmentCard } from '../components/equipment/EquipmentCard';
 import { mockStore } from '../services/mockStore';
+import { useLanguage } from '../context/LanguageContext';
 import { EquipmentCategory } from '../types';
 
 export const LandingPage: React.FC = () => {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const [searchLocation, setSearchLocation] = useState('Anand, Gujarat');
   const [searchCategory, setSearchCategory] = useState<string>('All');
   const [startDate, setStartDate] = useState('');
@@ -30,15 +32,15 @@ export const LandingPage: React.FC = () => {
 
   const featuredEquipment = mockStore.getEquipmentList().slice(0, 4);
 
-  const categories: { title: EquipmentCategory; desc: string; icon: string; count: number }[] = [
-    { title: 'Tractors', desc: '35 HP to 75 HP 4WD', icon: '🚜', count: 18 },
-    { title: 'Harvesters', desc: 'Combine & Paddy Cutters', icon: '🌾', count: 6 },
-    { title: 'Rotavators', desc: 'Multi-speed 5 to 7 feet', icon: '⚙️', count: 14 },
-    { title: 'Seed Drills', desc: 'Zero-Till & Multi-crop', icon: '🌱', count: 9 },
-    { title: 'Sprayers', desc: 'Boom & HTP 500L-1000L', icon: '💧', count: 11 },
-    { title: 'Cultivators', desc: 'Spring loaded 9-11 tynes', icon: '🛠️', count: 12 },
-    { title: 'Threshers', desc: 'Paddy & Wheat High Output', icon: '📦', count: 7 },
-    { title: 'Ploughs', desc: 'Hydraulic MB & Disc', icon: '⛏️', count: 8 },
+  const categories: { key: string; title: EquipmentCategory; icon: string; count: number }[] = [
+    { key: 'tractors', title: 'Tractors', icon: '🚜', count: 18 },
+    { key: 'harvesters', title: 'Harvesters', icon: '🌾', count: 6 },
+    { key: 'rotavators', title: 'Rotavators', icon: '⚙️', count: 14 },
+    { key: 'seedDrills', title: 'Seed Drills', icon: '🌱', count: 9 },
+    { key: 'sprayers', title: 'Sprayers', icon: '💧', count: 11 },
+    { key: 'cultivators', title: 'Cultivators', icon: '🛠️', count: 12 },
+    { key: 'threshers', title: 'Threshers', icon: '📦', count: 7 },
+    { key: 'ploughs', title: 'Ploughs', icon: '⛏️', count: 8 },
   ];
 
   const handleHeroSearch = (e: React.FormEvent) => {
@@ -61,15 +63,18 @@ export const LandingPage: React.FC = () => {
             <div className="lg:col-span-7 space-y-6">
               <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#164B35]/10 text-[#164B35] text-xs font-bold uppercase tracking-wider">
                 <Sparkles className="w-3.5 h-3.5 text-[#347653]" />
-                <span>Peer-to-Peer Agricultural Machinery Sharing</span>
+                <span>{t('hero.badge')}</span>
               </div>
 
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-[#164B35] font-heading tracking-tight leading-[1.1]">
-                Better farming starts with <span className="text-[#347653] underline decoration-[#B8D96B] decoration-4 underline-offset-8">sharing.</span>
+                {t('hero.title')}{' '}
+                <span className="text-[#347653] underline decoration-[#B8D96B] decoration-4 underline-offset-8">
+                  {t('hero.titleHighlight')}
+                </span>
               </h1>
 
               <p className="text-base sm:text-lg text-[#526058] max-w-2xl leading-relaxed">
-                Find the right machinery for your farm. Share your own equipment when it isn't in use. Single account for renting and listing across verified rural communities.
+                {t('hero.subtitle')}
               </p>
 
               {/* Quick Search Card */}
@@ -79,7 +84,7 @@ export const LandingPage: React.FC = () => {
                     {/* Location input */}
                     <div className="space-y-1">
                       <label className="block text-[11px] font-bold text-[#25312A] uppercase tracking-wide">
-                        Farm Location
+                        {t('hero.location')}
                       </label>
                       <div className="relative">
                         <MapPin className="w-4 h-4 text-[#347653] absolute left-3 top-3" />
@@ -87,7 +92,7 @@ export const LandingPage: React.FC = () => {
                           type="text"
                           value={searchLocation}
                           onChange={(e) => setSearchLocation(e.target.value)}
-                          placeholder="Village or District"
+                          placeholder={t('hero.locationPlaceholder')}
                           className="w-full text-xs pl-9 pr-3 py-2.5 bg-[#F7F8F2] rounded-xl border border-[#E2E7DE] focus:outline-none focus:ring-2 focus:ring-[#164B35] text-[#25312A] font-medium"
                         />
                       </div>
@@ -96,29 +101,29 @@ export const LandingPage: React.FC = () => {
                     {/* Category input */}
                     <div className="space-y-1">
                       <label className="block text-[11px] font-bold text-[#25312A] uppercase tracking-wide">
-                        Machinery Type
+                        {t('hero.machineryType')}
                       </label>
                       <select
                         value={searchCategory}
                         onChange={(e) => setSearchCategory(e.target.value)}
                         className="w-full text-xs px-3 py-2.5 bg-[#F7F8F2] rounded-xl border border-[#E2E7DE] focus:outline-none focus:ring-2 focus:ring-[#164B35] text-[#25312A] font-medium"
                       >
-                        <option value="All">All Categories</option>
-                        <option value="Tractors">Tractors</option>
-                        <option value="Harvesters">Harvesters</option>
-                        <option value="Rotavators">Rotavators</option>
-                        <option value="Seed Drills">Seed Drills</option>
-                        <option value="Sprayers">Sprayers</option>
-                        <option value="Cultivators">Cultivators</option>
-                        <option value="Threshers">Threshers</option>
-                        <option value="Ploughs">Ploughs</option>
+                        <option value="All">{t('hero.allCategories')}</option>
+                        <option value="Tractors">{t('cat.tractors')}</option>
+                        <option value="Harvesters">{t('cat.harvesters')}</option>
+                        <option value="Rotavators">{t('cat.rotavators')}</option>
+                        <option value="Seed Drills">{t('cat.seedDrills')}</option>
+                        <option value="Sprayers">{t('cat.sprayers')}</option>
+                        <option value="Cultivators">{t('cat.cultivators')}</option>
+                        <option value="Threshers">{t('cat.threshers')}</option>
+                        <option value="Ploughs">{t('cat.ploughs')}</option>
                       </select>
                     </div>
 
                     {/* Dates */}
                     <div className="space-y-1">
                       <label className="block text-[11px] font-bold text-[#25312A] uppercase tracking-wide">
-                        Start Date
+                        {t('hero.startDate')}
                       </label>
                       <input
                         type="date"
@@ -130,7 +135,7 @@ export const LandingPage: React.FC = () => {
 
                     <div className="space-y-1">
                       <label className="block text-[11px] font-bold text-[#25312A] uppercase tracking-wide">
-                        End Date
+                        {t('hero.endDate')}
                       </label>
                       <input
                         type="date"
@@ -144,7 +149,7 @@ export const LandingPage: React.FC = () => {
                   <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3">
                     <div className="flex items-center gap-2 text-xs text-[#526058]">
                       <ShieldCheck className="w-4 h-4 text-[#347653]" />
-                      <span>Zero upfront capital &bull; Verified village neighbors</span>
+                      <span>{t('hero.zeroCapital')}</span>
                     </div>
 
                     <Button
@@ -154,7 +159,7 @@ export const LandingPage: React.FC = () => {
                       leftIcon={<Search className="w-4 h-4" />}
                       className="w-full sm:w-auto"
                     >
-                      Find Equipment
+                      {t('hero.findBtn')}
                     </Button>
                   </div>
                 </form>
@@ -176,7 +181,7 @@ export const LandingPage: React.FC = () => {
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
                 <div className="absolute bottom-6 left-6 right-6 text-white space-y-1">
                   <span className="inline-block text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-[#B8D96B] text-[#164B35]">
-                    Active In-Field Rental
+                    {t('hero.activeRental')}
                   </span>
                   <h3 className="font-heading font-bold text-lg">Mahindra 575 DI (47 HP)</h3>
                   <p className="text-xs text-[#DCE8E2]">Rented by Ramesh Patel &bull; Anand, Gujarat</p>
@@ -189,8 +194,8 @@ export const LandingPage: React.FC = () => {
                   <CheckCircle2 className="w-6 h-6 text-[#347653]" />
                 </div>
                 <div>
-                  <p className="text-xs font-bold text-[#25312A]">100% Verified Farmers</p>
-                  <p className="text-[11px] text-[#526058]">Aadhaar / Land Verified Community</p>
+                  <p className="text-xs font-bold text-[#25312A]">{t('hero.verifiedFarmers')}</p>
+                  <p className="text-[11px] text-[#526058]">{t('hero.verifiedDesc')}</p>
                 </div>
               </div>
             </div>
@@ -203,17 +208,17 @@ export const LandingPage: React.FC = () => {
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
           <div>
             <span className="text-xs font-bold text-[#347653] uppercase tracking-wider">
-              Explore Farm Equipment
+              {t('cat.sectionBadge')}
             </span>
             <h2 className="text-2xl sm:text-3xl font-extrabold text-[#164B35] font-heading mt-1">
-              Machinery For Every Crop Stage
+              {t('cat.sectionTitle')}
             </h2>
           </div>
           <Link
             to="/equipment"
             className="text-xs font-bold text-[#164B35] hover:text-[#347653] flex items-center gap-1 group"
           >
-            <span>View All Machinery</span>
+            <span>{t('cat.viewAll')}</span>
             <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
           </Link>
         </div>
@@ -230,9 +235,9 @@ export const LandingPage: React.FC = () => {
                   {cat.icon}
                 </span>
                 <h3 className="font-heading font-bold text-sm text-[#25312A] group-hover:text-[#164B35] transition-colors">
-                  {cat.title}
+                  {t(`cat.${cat.key}`)}
                 </h3>
-                <p className="text-[11px] text-[#526058] mt-1">{cat.desc}</p>
+                <p className="text-[11px] text-[#526058] mt-1">{t(`cat.${cat.key}Desc`)}</p>
               </div>
               <div className="mt-4 pt-3 border-t border-[#E2E7DE]/60 flex items-center justify-between text-[11px] text-[#7C8C83]">
                 <span>{cat.count} Available</span>
@@ -248,17 +253,17 @@ export const LandingPage: React.FC = () => {
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
           <div>
             <span className="text-xs font-bold text-[#347653] uppercase tracking-wider">
-              Top Rated Near You
+              {t('feat.badge')}
             </span>
             <h2 className="text-2xl sm:text-3xl font-extrabold text-[#164B35] font-heading mt-1">
-              Featured Verified Machinery
+              {t('feat.title')}
             </h2>
           </div>
           <Link
             to="/equipment"
             className="text-xs font-bold text-[#164B35] hover:text-[#347653] flex items-center gap-1 group"
           >
-            <span>See All Listings</span>
+            <span>{t('cat.viewAll')}</span>
             <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
           </Link>
         </div>
@@ -275,13 +280,13 @@ export const LandingPage: React.FC = () => {
         <div className="max-w-7xl mx-auto space-y-12">
           <div className="text-center max-w-2xl mx-auto">
             <span className="text-xs font-bold text-[#347653] uppercase tracking-wider">
-              Simple 4-Step Process
+              {t('how.badge')}
             </span>
             <h2 className="text-2xl sm:text-3xl font-extrabold text-[#164B35] font-heading mt-1">
-              How Shared Farm Works
+              {t('how.title')}
             </h2>
             <p className="text-sm text-[#526058] mt-2">
-              Fair, transparent machinery rentals designed for farmers with zero bureaucratic friction.
+              {t('how.step1Desc')}
             </p>
           </div>
 
@@ -289,23 +294,23 @@ export const LandingPage: React.FC = () => {
             {[
               {
                 step: '01',
-                title: 'Search & Pick Machine',
-                desc: 'Find tractors, harvesters, or implements in your neighboring villages by hourly or daily rates.',
+                title: t('how.step1Title'),
+                desc: t('how.step1Desc'),
               },
               {
                 step: '02',
-                title: 'Schedule & Operator',
-                desc: 'Pick your dates. Choose whether you need an experienced driver or will operate the machinery yourself.',
+                title: t('how.step2Title'),
+                desc: t('how.step2Desc'),
               },
               {
                 step: '03',
-                title: 'Owner Confirms',
-                desc: 'The equipment owner accepts the booking. Security deposits are held safely in escrow.',
+                title: t('how.step3Title'),
+                desc: t('how.step3Desc'),
               },
               {
                 step: '04',
-                title: 'Work & Review',
-                desc: 'Complete your fieldwork, return the machinery, release payment, and share transparent farmer ratings.',
+                title: t('how.step4Title'),
+                desc: t('how.step4Desc'),
               },
             ].map((item) => (
               <div

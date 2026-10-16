@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User } from '../types';
 import { authService, isDemoModeActive, setDemoModeActive } from '../services/auth.service';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { mockStore } from '../services/mockStore';
 import { toast } from 'sonner';
 
@@ -13,7 +14,7 @@ interface AuthContextType {
   login: (email: string, pass: string) => Promise<void>;
   register: (userData: Partial<User> & { password?: string }) => Promise<void>;
   logout: () => Promise<void>;
-  updateUser: (updates: Partial<User>) => void;
+  updateUser: (updates: Partial<User>) => Promise<void>;
   resetDemoData: () => void;
 }
 
@@ -25,6 +26,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isDemoMode, setIsDemoMode] = useState<boolean>(isDemoModeActive());
 
   useEffect(() => {
+    let authListener: { subscription: { unsubscribe: () => void } } | null = null;
+
     const initAuth = async () => {
       try {
         const currentUser = await authService.getCurrentUser();
@@ -37,6 +40,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     };
     initAuth();
+
+    if (isSupabaseConfigured()) {
+      const { data } = supabase.auth.onAuthStateChange(async (_event, session) => {
+        if (session?.user) {
+          const currentUser = await authService.getCurrentUser();
+          setUser(currentUser);
+        } else if (!isDemoModeActive()) {
+          setUser(null);
+        }
+      });
+      authListener = data;
+    }
+
+    return () => {
+      if (authListener) authListener.subscription.unsubscribe();
+    };
   }, [isDemoMode]);
 
   const toggleDemoMode = (enabled?: boolean) => {
@@ -86,14 +105,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     toast.info('You have logged out.');
   };
 
-  const updateUser = (updates: Partial<User>) => {
+  const updateUser = async (updates: Partial<User>): Promise<void> => {
     if (!user) return;
     if (isDemoMode) {
       const updated = mockStore.updateUser(updates);
       setUser(updated);
       toast.success('Profile updated successfully');
     } else {
-      setUser({ ...user, ...updates });
+      try {
+        const updated = await authService.updateProfile(user.id, updates);
+        setUser(updated);
+        toast.success('Profile updated successfully');
+      } catch (err: any) {
+        setUser({ ...user, ...updates });
+        toast.error(err.message || 'Failed to update profile in database');
+      }
     }
   };
 

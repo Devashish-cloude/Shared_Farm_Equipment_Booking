@@ -1,10 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Equipment, EquipmentCategory, EquipmentCondition } from '../../types';
 import { Button } from '../ui/Button';
-import { Plus, Trash2, Image as ImageIcon, Sparkles, MapPin, Wrench } from 'lucide-react';
+import { Plus, Trash2, Image as ImageIcon, Sparkles, MapPin, Wrench, Upload } from 'lucide-react';
+import { storageService } from '../../services/storage.service';
+import { useAuth } from '../../context/AuthContext';
+import { isSupabaseConfigured } from '../../lib/supabase';
+import { toast } from 'sonner';
 
 const equipmentSchema = z.object({
   title: z.string().min(5, 'Title must be at least 5 characters'),
@@ -48,12 +52,49 @@ export const EquipmentForm: React.FC<EquipmentFormProps> = ({
   onSubmit,
   isLoading = false,
 }) => {
+  const { user } = useAuth();
   const [images, setImages] = useState<string[]>(
     initialData?.images && initialData.images.length > 0
       ? initialData.images
       : ['https://images.unsplash.com/photo-1592982537447-7440770cbfc9?w=800&auto=format&fit=crop&q=80']
   );
   const [newImageUrl, setNewImageUrl] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('File size exceeds 5MB limit');
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const userId = user?.id || 'farmer_user';
+      if (isSupabaseConfigured()) {
+        const res = await storageService.uploadEquipmentImage(file, userId);
+        setImages((prev) => [...prev, res.url]);
+        toast.success('Equipment photo uploaded successfully to Supabase Storage!');
+      } else {
+        const reader = new FileReader();
+        reader.onload = () => {
+          if (typeof reader.result === 'string') {
+            setImages((prev) => [...prev, reader.result as string]);
+            toast.success('Photo added!');
+          }
+        };
+        reader.readAsDataURL(file);
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Image upload failed');
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
 
   const {
     register,
@@ -267,17 +308,38 @@ export const EquipmentForm: React.FC<EquipmentFormProps> = ({
           ))}
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2">
           <input
-            type="url"
-            value={newImageUrl}
-            onChange={(e) => setNewImageUrl(e.target.value)}
-            placeholder="Paste image URL (e.g. https://... or leave default authentic photo)"
-            className="flex-1 text-xs p-3 rounded-xl border border-[#CBD5C7] focus:outline-none focus:ring-2 focus:ring-[#164B35] bg-[#F7F8F2]/50 text-[#25312A]"
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileUpload}
+            accept="image/jpeg,image/png,image/webp,image/avif"
+            className="hidden"
           />
-          <Button type="button" variant="outline" size="sm" onClick={addImage} leftIcon={<Plus className="w-4 h-4" />}>
-            Add Image
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => fileInputRef.current?.click()}
+            isLoading={isUploading}
+            leftIcon={<Upload className="w-4 h-4" />}
+            className="border-[#164B35] text-[#164B35] hover:bg-[#F0F5F2]"
+          >
+            Upload Photo (Max 5MB)
           </Button>
+
+          <div className="flex-1 flex gap-2">
+            <input
+              type="url"
+              value={newImageUrl}
+              onChange={(e) => setNewImageUrl(e.target.value)}
+              placeholder="Or paste an image URL (e.g. https://...)"
+              className="flex-1 text-xs p-3 rounded-xl border border-[#CBD5C7] focus:outline-none focus:ring-2 focus:ring-[#164B35] bg-[#F7F8F2]/50 text-[#25312A]"
+            />
+            <Button type="button" variant="ghost" size="sm" onClick={addImage} leftIcon={<Plus className="w-4 h-4" />}>
+              Add URL
+            </Button>
+          </div>
         </div>
       </div>
 

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { Button } from '../../components/ui/Button';
 import {
   User,
@@ -17,6 +18,7 @@ import { toast } from 'sonner';
 
 export const ProfilePage: React.FC = () => {
   const { user, updateUser } = useAuth();
+  const { setLanguage } = useLanguage();
 
   const [formData, setFormData] = useState({
     name: user?.name || 'Ramesh Patel',
@@ -51,6 +53,7 @@ export const ProfilePage: React.FC = () => {
         },
         preferredLanguage: formData.preferredLanguage,
       });
+      setLanguage(formData.preferredLanguage);
       setIsSaving(false);
       toast.success('Profile and farm specifications updated!');
     }, 400);

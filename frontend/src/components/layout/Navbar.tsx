@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
+import { SUPPORTED_LANGUAGES } from '../../i18n/translations';
 import {
   Sprout,
   Menu,
@@ -12,21 +14,23 @@ import {
   Search,
   LogOut,
   User,
-  Bell
+  Bell,
+  Check,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 
 export const Navbar: React.FC = () => {
   const { user, isAuthenticated, logout } = useAuth();
+  const { language, setLanguage, t } = useLanguage();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [langMenuOpen, setLangMenuOpen] = useState(false);
-  const [selectedLang, setSelectedLang] = useState('English');
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
 
   const navigate = useNavigate();
   const location = useLocation();
 
-  const languages = ['English', 'हिन्दी (Hindi)', 'ગુજરાતી (Gujarati)', 'ਪੰਜਾਬੀ (Punjabi)', 'मराठी (Marathi)'];
+  const currentLangOption =
+    SUPPORTED_LANGUAGES.find((l) => l.code === language) || SUPPORTED_LANGUAGES[0];
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -50,7 +54,7 @@ export const Navbar: React.FC = () => {
                 Shared Farm
               </span>
               <span className="text-[11px] text-[#526058] font-medium tracking-wide mt-0.5">
-                Share Equipment. Grow Together.
+                {t('nav.tagline')}
               </span>
             </div>
           </Link>
@@ -64,14 +68,14 @@ export const Navbar: React.FC = () => {
               }`}
             >
               <Search className="w-4 h-4" />
-              <span>Explore Equipment</span>
+              <span>{t('nav.explore')}</span>
             </Link>
 
             <a
               href="/#how-it-works"
               className="text-sm font-semibold text-[#526058] hover:text-[#164B35] transition-colors"
             >
-              How It Works
+              {t('nav.howItWorks')}
             </a>
 
             <Link
@@ -79,32 +83,43 @@ export const Navbar: React.FC = () => {
               className="text-sm font-semibold text-[#164B35] hover:text-[#347653] transition-colors flex items-center gap-1.5"
             >
               <PlusCircle className="w-4 h-4 text-[#347653]" />
-              <span>List Equipment</span>
+              <span>{t('nav.listEquipment')}</span>
             </Link>
 
             {/* Language Selector Dropdown */}
             <div className="relative">
               <button
                 onClick={() => setLangMenuOpen(!langMenuOpen)}
-                className="flex items-center gap-1.5 text-xs font-semibold text-[#526058] hover:text-[#164B35] px-2.5 py-1.5 rounded-lg border border-[#E2E7DE] hover:border-[#CBD5C7] transition-colors"
+                className="flex items-center gap-1.5 text-xs font-semibold text-[#164B35] bg-[#F7F8F2] hover:bg-[#EFF2EB] px-3 py-1.5 rounded-lg border border-[#CBD5C7] transition-colors"
+                title="Change language / भाषा बदलें / ભાષા બદલો"
               >
                 <Globe className="w-3.5 h-3.5 text-[#347653]" />
-                <span>{selectedLang.split(' ')[0]}</span>
+                <span className="font-bold">{currentLangOption.nativeName}</span>
                 <ChevronDown className="w-3 h-3 text-[#7C8C83]" />
               </button>
 
               {langMenuOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-[#E2E7DE] py-1 z-50 animate-in fade-in zoom-in-95 duration-150">
-                  {languages.map((lang) => (
+                <div className="absolute right-0 mt-2 w-52 bg-white rounded-xl shadow-xl border border-[#E2E7DE] py-1.5 z-50 animate-in fade-in zoom-in-95 duration-150">
+                  <div className="px-3 py-1 text-[10px] uppercase font-bold text-[#7C8C83] tracking-wider border-b border-[#E2E7DE]/60 mb-1">
+                    Select Language
+                  </div>
+                  {SUPPORTED_LANGUAGES.map((lang) => (
                     <button
-                      key={lang}
+                      key={lang.code}
                       onClick={() => {
-                        setSelectedLang(lang);
+                        setLanguage(lang.code);
                         setLangMenuOpen(false);
                       }}
-                      className="w-full text-left px-3.5 py-2 text-xs text-[#25312A] hover:bg-[#F7F8F2] hover:text-[#164B35] font-medium transition-colors"
+                      className={`w-full text-left px-3.5 py-2 text-xs flex items-center justify-between font-medium transition-colors ${
+                        language === lang.code
+                          ? 'bg-[#F0F5F2] text-[#164B35] font-bold'
+                          : 'text-[#25312A] hover:bg-[#F7F8F2] hover:text-[#164B35]'
+                      }`}
                     >
-                      {lang}
+                      <span className="flex items-center gap-2">
+                        <span className="font-medium">{lang.display}</span>
+                      </span>
+                      {language === lang.code && <Check className="w-4 h-4 text-[#347653]" />}
                     </button>
                   ))}
                 </div>
@@ -161,7 +176,7 @@ export const Navbar: React.FC = () => {
                           className="flex items-center gap-2.5 px-4 py-2 text-xs font-medium text-[#25312A] hover:bg-[#F7F8F2] hover:text-[#164B35]"
                         >
                           <LayoutDashboard className="w-4 h-4 text-[#347653]" />
-                          Unified Dashboard
+                          {t('nav.dashboard')}
                         </Link>
                         <Link
                           to="/dashboard/rentals"
@@ -169,7 +184,7 @@ export const Navbar: React.FC = () => {
                           className="flex items-center gap-2.5 px-4 py-2 text-xs font-medium text-[#25312A] hover:bg-[#F7F8F2] hover:text-[#164B35]"
                         >
                           <Search className="w-4 h-4 text-[#347653]" />
-                          My Rentals (Renting)
+                          {t('nav.myRentals')}
                         </Link>
                         <Link
                           to="/dashboard/equipment"
@@ -177,7 +192,7 @@ export const Navbar: React.FC = () => {
                           className="flex items-center gap-2.5 px-4 py-2 text-xs font-medium text-[#25312A] hover:bg-[#F7F8F2] hover:text-[#164B35]"
                         >
                           <PlusCircle className="w-4 h-4 text-[#347653]" />
-                          My Equipment (Sharing)
+                          {t('nav.myEquipment')}
                         </Link>
                         <Link
                           to="/dashboard/profile"
@@ -185,7 +200,7 @@ export const Navbar: React.FC = () => {
                           className="flex items-center gap-2.5 px-4 py-2 text-xs font-medium text-[#25312A] hover:bg-[#F7F8F2] hover:text-[#164B35]"
                         >
                           <User className="w-4 h-4 text-[#347653]" />
-                          Profile &amp; Farm Settings
+                          {t('nav.profile')}
                         </Link>
                       </div>
 
@@ -195,7 +210,7 @@ export const Navbar: React.FC = () => {
                           className="w-full flex items-center gap-2.5 px-4 py-2 text-xs font-medium text-rose-600 hover:bg-rose-50 transition-colors"
                         >
                           <LogOut className="w-4 h-4 text-rose-500" />
-                          Log Out
+                          {t('nav.logout')}
                         </button>
                       </div>
                     </div>
@@ -204,7 +219,7 @@ export const Navbar: React.FC = () => {
 
                 <Link to="/dashboard">
                   <Button variant="primary" size="sm" className="hidden lg:inline-flex">
-                    Dashboard
+                    {t('nav.dashboard')}
                   </Button>
                 </Link>
               </div>
@@ -212,12 +227,12 @@ export const Navbar: React.FC = () => {
               <div className="flex items-center gap-3">
                 <Link to="/login">
                   <Button variant="ghost" size="sm">
-                    Log In
+                    {t('nav.login')}
                   </Button>
                 </Link>
                 <Link to="/register">
                   <Button variant="primary" size="sm">
-                    Get Started
+                    {t('nav.getStarted')}
                   </Button>
                 </Link>
               </div>
@@ -240,6 +255,28 @@ export const Navbar: React.FC = () => {
       {/* Mobile Drawer Navigation */}
       {mobileMenuOpen && (
         <div className="md:hidden bg-white border-b border-[#E2E7DE] px-4 pt-3 pb-6 space-y-4 animate-in slide-in-from-top-2 duration-200">
+          {/* Mobile Language Switcher */}
+          <div className="pb-3 border-b border-[#E2E7DE]">
+            <span className="block text-[11px] font-bold text-[#7C8C83] uppercase mb-2">
+              Language / भाषा
+            </span>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+              {SUPPORTED_LANGUAGES.map((lang) => (
+                <button
+                  key={lang.code}
+                  onClick={() => setLanguage(lang.code)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold text-center transition-colors border ${
+                    language === lang.code
+                      ? 'bg-[#164B35] text-white border-[#164B35]'
+                      : 'bg-[#F7F8F2] text-[#25312A] border-[#E2E7DE] hover:bg-[#EFF2EB]'
+                  }`}
+                >
+                  {lang.nativeName}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="flex flex-col space-y-2">
             <Link
               to="/equipment"
@@ -247,14 +284,14 @@ export const Navbar: React.FC = () => {
               className="px-3 py-2.5 rounded-xl text-sm font-semibold text-[#25312A] hover:bg-[#F7F8F2] flex items-center gap-2"
             >
               <Search className="w-4 h-4 text-[#347653]" />
-              Explore Equipment
+              {t('nav.explore')}
             </Link>
             <a
               href="/#how-it-works"
               onClick={() => setMobileMenuOpen(false)}
               className="px-3 py-2.5 rounded-xl text-sm font-semibold text-[#25312A] hover:bg-[#F7F8F2]"
             >
-              How It Works
+              {t('nav.howItWorks')}
             </a>
             <Link
               to={isAuthenticated ? '/dashboard/equipment/new' : '/login'}
@@ -262,7 +299,7 @@ export const Navbar: React.FC = () => {
               className="px-3 py-2.5 rounded-xl text-sm font-semibold text-[#164B35] hover:bg-[#F0F5F2] flex items-center gap-2"
             >
               <PlusCircle className="w-4 h-4 text-[#347653]" />
-              List Equipment to Share
+              {t('nav.listEquipment')}
             </Link>
           </div>
 
@@ -284,7 +321,7 @@ export const Navbar: React.FC = () => {
                 <div className="grid grid-cols-2 gap-2">
                   <Link to="/dashboard" onClick={() => setMobileMenuOpen(false)}>
                     <Button variant="primary" size="sm" className="w-full">
-                      Dashboard
+                      {t('nav.dashboard')}
                     </Button>
                   </Link>
                   <Button
@@ -293,7 +330,7 @@ export const Navbar: React.FC = () => {
                     className="w-full text-rose-600 border-rose-200"
                     onClick={handleLogout}
                   >
-                    Log Out
+                    {t('nav.logout')}
                   </Button>
                 </div>
               </div>
@@ -301,12 +338,12 @@ export const Navbar: React.FC = () => {
               <div className="grid grid-cols-2 gap-3">
                 <Link to="/login" onClick={() => setMobileMenuOpen(false)}>
                   <Button variant="outline" size="md" className="w-full">
-                    Log In
+                    {t('nav.login')}
                   </Button>
                 </Link>
                 <Link to="/register" onClick={() => setMobileMenuOpen(false)}>
                   <Button variant="primary" size="md" className="w-full">
-                    Get Started
+                    {t('nav.getStarted')}
                   </Button>
                 </Link>
               </div>
