@@ -6,6 +6,9 @@ import {
   translations,
 } from '../i18n/translations';
 
+export type { LanguageCode } from '../i18n/translations';
+export { SUPPORTED_LANGUAGES, normalizeLanguageCode } from '../i18n/translations';
+
 interface LanguageContextType {
   language: LanguageCode;
   selectedLangDisplay: string;
@@ -27,9 +30,15 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const normalized = normalizeLanguageCode(lang);
     setLanguageState(normalized);
     localStorage.setItem(STORAGE_KEY, normalized);
+    if (typeof document !== 'undefined') {
+      document.documentElement.lang = normalized;
+    }
   };
 
   useEffect(() => {
+    if (typeof document !== 'undefined') {
+      document.documentElement.lang = language;
+    }
     // Listen to storage events in case changed across tabs
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === STORAGE_KEY && e.newValue) {
@@ -38,7 +47,7 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     };
     window.addEventListener('storage', handleStorageChange);
     return () => window.removeEventListener('storage', handleStorageChange);
-  }, []);
+  }, [language]);
 
   const t = (key: string, defaultText?: string): string => {
     const currentDict = translations[language] || translations.en;

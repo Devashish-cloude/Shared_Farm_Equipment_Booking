@@ -1,6 +1,7 @@
 import React from 'react';
 import { NavLink, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import {
   LayoutDashboard,
   Search,
@@ -26,6 +27,7 @@ interface DashboardSidebarProps {
 
 export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ onCloseMobile }) => {
   const { user } = useAuth();
+  const { t } = useLanguage();
 
   // Dynamic counts for badges
   const pendingRequestsCount = mockStore
@@ -40,67 +42,67 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ onCloseMobil
 
   const navItems = [
     {
-      group: 'Core Management',
+      group: t('dash.coreManagement'),
       items: [
-        { label: 'Overview', to: '/dashboard', icon: LayoutDashboard, exact: true },
-        { label: 'Find Equipment', to: '/equipment', icon: Search },
+        { label: t('dash.overview'), to: '/dashboard', icon: LayoutDashboard, exact: true },
+        { label: t('dash.findEquipment'), to: '/equipment', icon: Search },
       ],
     },
     {
-      group: 'Unified Farmer Flow',
+      group: t('dash.unifiedFarmerFlow'),
       items: [
         {
-          label: 'My Rentals (Renting)',
+          label: t('dash.myRentals'),
           to: '/dashboard/rentals',
           icon: KeyRound,
-          badge: activeRentalsCount > 0 ? `${activeRentalsCount} Active` : undefined,
+          badge: activeRentalsCount > 0 ? `${activeRentalsCount} ${t('dash.activeBadge')}` : undefined,
           badgeColor: 'bg-blue-100 text-blue-800',
         },
         {
-          label: 'My Equipment (Sharing)',
+          label: t('dash.myEquipment'),
           to: '/dashboard/equipment',
           icon: Tractor,
         },
         {
-          label: 'Booking Requests',
+          label: t('dash.bookingRequests'),
           to: '/dashboard/requests',
           icon: Inbox,
-          badge: pendingRequestsCount > 0 ? `${pendingRequestsCount} New` : undefined,
+          badge: pendingRequestsCount > 0 ? `${pendingRequestsCount} ${t('dash.newBadge')}` : undefined,
           badgeColor: 'bg-amber-100 text-amber-800 animate-pulse',
         },
         {
-          label: 'Unified Calendar',
+          label: t('dash.unifiedCalendar'),
           to: '/dashboard/calendar',
           icon: Calendar,
         },
         {
-          label: 'Live Rental Tracking',
+          label: t('dash.liveTracking'),
           to: '/dashboard/tracking',
           icon: Navigation,
-          badge: activeRentalsCount > 0 ? 'Live GPS' : undefined,
+          badge: activeRentalsCount > 0 ? t('dash.liveGpsBadge') : undefined,
           badgeColor: 'bg-emerald-100 text-[#164B35]',
         },
       ],
     },
     {
-      group: 'Finance & Comms',
+      group: t('dash.financeComms'),
       items: [
-        { label: 'Earnings & Payouts', to: '/dashboard/earnings', icon: Wallet },
-        { label: 'Messages', to: '/dashboard/messages', icon: MessageSquare },
+        { label: t('dash.earnings'), to: '/dashboard/earnings', icon: Wallet },
+        { label: t('dash.messages'), to: '/dashboard/messages', icon: MessageSquare },
         {
-          label: 'Notifications',
+          label: t('dash.notifications'),
           to: '/dashboard/notifications',
           icon: Bell,
           badge: unreadNotifsCount > 0 ? `${unreadNotifsCount}` : undefined,
           badgeColor: 'bg-red-100 text-red-700',
         },
-        { label: 'Profile & Farm Details', to: '/dashboard/profile', icon: UserCheck },
+        { label: t('dash.profile'), to: '/dashboard/profile', icon: UserCheck },
       ],
     },
     {
-      group: 'Platform Administration',
+      group: t('dash.adminPortal'),
       items: [
-        { label: 'Admin Portal (Preview)', to: '/admin', icon: ShieldAlert },
+        { label: t('dash.adminPortal'), to: '/admin', icon: ShieldAlert },
       ]
     }
   ];
@@ -118,7 +120,7 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ onCloseMobil
               Shared Farm
             </span>
             <span className="text-[10px] text-[#526058] font-semibold mt-0.5">
-              Unified Farmer Dashboard
+              {t('dash.tagline')}
             </span>
           </div>
         </Link>
@@ -142,7 +144,7 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ onCloseMobil
           className="w-full flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-[#164B35] hover:bg-[#235D40] text-white font-semibold text-xs transition-all shadow-xs group"
         >
           <PlusCircle className="w-4 h-4 text-[#B8D96B] group-hover:scale-110 transition-transform" />
-          <span>+ Add Equipment to Share</span>
+          <span>{t('dash.addEquipmentBtn')}</span>
         </Link>
       </div>
 

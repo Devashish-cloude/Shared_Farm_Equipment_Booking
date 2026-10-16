@@ -62,6 +62,64 @@ describe('Internationalization & Multi-language System', () => {
     expect(codes).toContain('pa');
     expect(codes).toContain('mr');
   });
+
+  it('guarantees complete translation of dashboard sidebar, header, rentals, cards, timelines and statuses', () => {
+    const dashboardKeys = [
+      'dash.coreManagement',
+      'dash.overview',
+      'dash.findEquipment',
+      'dash.unifiedFarmerFlow',
+      'dash.myRentals',
+      'dash.myEquipment',
+      'dash.bookingRequests',
+      'dash.unifiedCalendar',
+      'dash.liveTracking',
+      'dash.financeComms',
+      'dash.earnings',
+      'dash.greeting',
+      'dash.findBtn',
+      'dash.listBtn',
+      'dash.tagline',
+      'status.pending',
+      'status.confirmed',
+      'status.active',
+      'status.completed',
+      'status.declined',
+      'status.cancelled',
+      'timeline.requested',
+      'timeline.confirmed',
+      'timeline.inField',
+      'timeline.completed',
+      'rentals.title',
+      'rentals.subtitle',
+      'rentals.findMore',
+      'rentals.allRentals',
+      'rentals.activeTab',
+      'rentals.upcomingTab',
+      'card.total',
+      'card.paidVia',
+      'card.hoursDuration',
+      'card.driverIncluded',
+      'card.startRental',
+      'card.completeRental',
+      'overview.singleAccount',
+      'overview.welcome',
+      'overview.findRent',
+      'overview.listShare',
+      'requests.title',
+      'equip.title',
+    ];
+
+    const langCodes: Array<'en' | 'hi' | 'gu' | 'pa' | 'mr'> = ['en', 'hi', 'gu', 'pa', 'mr'];
+
+    for (const code of langCodes) {
+      const dict = translations[code];
+      for (const key of dashboardKeys) {
+        expect(dict[key], `Missing dashboard/rental key "${key}" in language "${code}"`).toBeTruthy();
+        expect(dict[key].trim().length).toBeGreaterThan(0);
+      }
+    }
+  });
 });
 
 describe('Supabase Client & Data Harmonization', () => {

@@ -1,5 +1,6 @@
 import React from 'react';
 import { BookingStatus } from '../../types';
+import { useLanguage } from '../../context/LanguageContext';
 import { Check, Clock, Play, CheckCircle2, XCircle } from 'lucide-react';
 
 interface BookingTimelineProps {
@@ -7,20 +8,22 @@ interface BookingTimelineProps {
 }
 
 export const BookingTimeline: React.FC<BookingTimelineProps> = ({ status }) => {
+  const { t } = useLanguage();
+
   if (status === 'cancelled' || status === 'rejected') {
     return (
       <div className="flex items-center gap-2 p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800">
         <XCircle className="w-4 h-4 text-rose-600 shrink-0" />
-        <span>This booking was {status === 'cancelled' ? 'cancelled' : 'declined by the owner'}.</span>
+        <span>{status === 'cancelled' ? t('timeline.cancelledNotice') : t('timeline.declinedNotice')}</span>
       </div>
     );
   }
 
   const steps = [
-    { key: 'pending', label: 'Requested', icon: Clock },
-    { key: 'accepted', label: 'Confirmed', icon: Check },
-    { key: 'active', label: 'In-Field', icon: Play },
-    { key: 'completed', label: 'Completed', icon: CheckCircle2 },
+    { key: 'pending', label: t('timeline.requested'), icon: Clock },
+    { key: 'accepted', label: t('timeline.confirmed'), icon: Check },
+    { key: 'active', label: t('timeline.inField'), icon: Play },
+    { key: 'completed', label: t('timeline.completed'), icon: CheckCircle2 },
   ];
 
   const getStepIndex = (s: BookingStatus) => {

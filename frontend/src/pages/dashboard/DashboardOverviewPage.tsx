@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { mockStore } from '../../services/mockStore';
 import { formatCurrency, formatDate } from '../../lib/utils';
 import { Button } from '../../components/ui/Button';
@@ -33,6 +34,7 @@ import {
 
 export const DashboardOverviewPage: React.FC = () => {
   const { user } = useAuth();
+  const { t } = useLanguage();
 
   // Metrics from mockStore
   const allBookings = mockStore.getBookings();
@@ -64,13 +66,13 @@ export const DashboardOverviewPage: React.FC = () => {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <span className="text-[11px] font-extrabold uppercase px-3 py-1 rounded-full bg-[#B8D96B] text-[#164B35] inline-block mb-2">
-              Single Unified Farmer Account
+              {t('overview.singleAccount')}
             </span>
             <h1 className="text-2xl sm:text-3xl font-extrabold font-heading">
-              Welcome, {user?.name}!
+              {t('overview.welcome')}, {user?.name}!
             </h1>
             <p className="text-xs text-[#DCE8E2] mt-1">
-              Farm Location: {user?.location.village}, {user?.location.district} &bull; {user?.farmDetails?.farmSizeAcres || 18} Acres
+              {t('overview.farmLocation')}: {user?.location?.village || 'Anand'}, {user?.location?.district || 'Gujarat'} &bull; {user?.farmDetails?.farmSizeAcres || 18} {t('overview.acres')}
             </p>
           </div>
 
@@ -83,7 +85,7 @@ export const DashboardOverviewPage: React.FC = () => {
                 leftIcon={<Search className="w-4 h-4 text-[#164B35]" />}
                 className="font-bold shadow-sm"
               >
-                Find Equipment (Rent)
+                {t('overview.findRent')}
               </Button>
             </Link>
 
@@ -94,7 +96,7 @@ export const DashboardOverviewPage: React.FC = () => {
                 leftIcon={<PlusCircle className="w-4 h-4 text-[#B8D96B]" />}
                 className="bg-white/20 hover:bg-white/30 text-white border border-white/20 font-bold"
               >
-                List Equipment (Share)
+                {t('overview.listShare')}
               </Button>
             </Link>
           </div>
@@ -113,15 +115,15 @@ export const DashboardOverviewPage: React.FC = () => {
               <KeyRound className="w-5 h-5" />
             </div>
             <span className="text-[10px] font-bold text-blue-800 bg-blue-50 px-2 py-0.5 rounded-full">
-              Renting
+              {t('overview.renting')}
             </span>
           </div>
-          <p className="text-xs text-[#7C8C83] font-medium">My Active Rentals</p>
+          <p className="text-xs text-[#7C8C83] font-medium">{t('overview.activeRentals')}</p>
           <div className="flex items-baseline gap-2 mt-1">
             <h3 className="text-2xl font-extrabold font-heading text-[#25312A]">
               {activeRentals.length}
             </h3>
-            <span className="text-xs text-[#526058]">in-field right now</span>
+            <span className="text-xs text-[#526058]">{t('overview.inFieldNow')}</span>
           </div>
         </Link>
 
@@ -135,15 +137,15 @@ export const DashboardOverviewPage: React.FC = () => {
               <Tractor className="w-5 h-5" />
             </div>
             <span className="text-[10px] font-bold text-[#164B35] bg-emerald-50 px-2 py-0.5 rounded-full">
-              Sharing
+              {t('overview.sharing')}
             </span>
           </div>
-          <p className="text-xs text-[#7C8C83] font-medium">My Listed Machinery</p>
+          <p className="text-xs text-[#7C8C83] font-medium">{t('overview.myListedMachinery')}</p>
           <div className="flex items-baseline gap-2 mt-1">
             <h3 className="text-2xl font-extrabold font-heading text-[#25312A]">
               {myListings.length}
             </h3>
-            <span className="text-xs text-[#526058]">active implements</span>
+            <span className="text-xs text-[#526058]">{t('overview.activeImplements')}</span>
           </div>
         </Link>
 
@@ -158,16 +160,16 @@ export const DashboardOverviewPage: React.FC = () => {
             </div>
             {pendingRequests.length > 0 && (
               <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full animate-pulse">
-                Needs Action
+                {t('overview.needsAction')}
               </span>
             )}
           </div>
-          <p className="text-xs text-[#7C8C83] font-medium">Pending Requests</p>
+          <p className="text-xs text-[#7C8C83] font-medium">{t('overview.pendingRequests')}</p>
           <div className="flex items-baseline gap-2 mt-1">
             <h3 className="text-2xl font-extrabold font-heading text-[#25312A]">
               {pendingRequests.length}
             </h3>
-            <span className="text-xs text-[#526058]">incoming farmer requests</span>
+            <span className="text-xs text-[#526058]">{t('overview.incomingRequests')}</span>
           </div>
         </Link>
 
@@ -181,10 +183,10 @@ export const DashboardOverviewPage: React.FC = () => {
               <Wallet className="w-5 h-5" />
             </div>
             <span className="text-[10px] font-bold text-purple-800 bg-purple-50 px-2 py-0.5 rounded-full">
-              Payouts
+              {t('overview.payouts')}
             </span>
           </div>
-          <p className="text-xs text-[#7C8C83] font-medium">Net Rental Earnings</p>
+          <p className="text-xs text-[#7C8C83] font-medium">{t('overview.netEarnings')}</p>
           <div className="flex items-baseline gap-2 mt-1">
             <h3 className="text-2xl font-extrabold font-heading text-[#164B35]">
               {formatCurrency(netEarnings)}
@@ -202,16 +204,16 @@ export const DashboardOverviewPage: React.FC = () => {
             </div>
             <div>
               <h4 className="text-xs font-bold text-blue-900 font-heading">
-                Live Rental in Progress: {activeRentals[0].equipmentName}
+                {t('overview.liveProgress')}: {activeRentals[0].equipmentName}
               </h4>
               <p className="text-xs text-blue-700">
-                Operating with driver &bull; Simulated GPS telemetry active
+                {t('overview.withDriverTelemetry')}
               </p>
             </div>
           </div>
           <Link to={`/dashboard/tracking/${activeRentals[0].id}`}>
             <Button variant="primary" size="sm" className="bg-blue-700 hover:bg-blue-800">
-              Open Live GPS Tracker
+              {t('overview.openGps')}
             </Button>
           </Link>
         </div>
@@ -225,21 +227,21 @@ export const DashboardOverviewPage: React.FC = () => {
             <div className="flex items-center gap-2">
               <KeyRound className="w-4 h-4 text-[#347653]" />
               <h3 className="font-heading font-bold text-base text-[#25312A]">
-                My Upcoming &amp; Active Rentals
+                {t('overview.upcomingActive')}
               </h3>
             </div>
             <Link
               to="/dashboard/rentals"
               className="text-xs font-bold text-[#164B35] hover:underline flex items-center gap-1"
             >
-              <span>View All</span>
+              <span>{t('overview.viewAll')}</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
 
           {upcomingRentals.length === 0 && activeRentals.length === 0 ? (
             <p className="text-xs text-[#7C8C83] py-6 text-center">
-              No active or upcoming equipment rentals.
+              {t('overview.noRentals')}
             </p>
           ) : (
             <div className="space-y-3">
@@ -284,14 +286,14 @@ export const DashboardOverviewPage: React.FC = () => {
             <div className="flex items-center gap-2">
               <Inbox className="w-4 h-4 text-[#347653]" />
               <h3 className="font-heading font-bold text-base text-[#25312A]">
-                Incoming Booking Requests
+                {t('requests.title')}
               </h3>
             </div>
             <Link
               to="/dashboard/requests"
               className="text-xs font-bold text-[#164B35] hover:underline flex items-center gap-1"
             >
-              <span>Manage Requests</span>
+              <span>{t('overview.viewAll')}</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>

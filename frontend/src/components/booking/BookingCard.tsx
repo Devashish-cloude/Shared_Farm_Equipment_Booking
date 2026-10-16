@@ -4,6 +4,7 @@ import { Booking } from '../../types';
 import { StatusBadge } from '../ui/StatusBadge';
 import { BookingTimeline } from './BookingTimeline';
 import { Button } from '../ui/Button';
+import { useLanguage } from '../../context/LanguageContext';
 import { formatCurrency, formatDate } from '../../lib/utils';
 import {
   Calendar,
@@ -34,6 +35,7 @@ export const BookingCard: React.FC<BookingCardProps> = ({
   onCancelBooking,
   onReview,
 }) => {
+  const { t } = useLanguage();
   const start = new Date(booking.startDate);
   const end = new Date(booking.endDate);
 
@@ -47,10 +49,12 @@ export const BookingCard: React.FC<BookingCardProps> = ({
         </div>
         <div className="text-right">
           <span className="text-xs font-bold text-[#164B35]">
-            Total: {formatCurrency(booking.totalPrice)}
+            {t('card.total')}: {formatCurrency(booking.totalPrice)}
           </span>
           <span className="block text-[10px] text-[#7C8C83]">
-            {booking.paymentStatus === 'paid' ? 'Paid via ' + (booking.paymentMethod?.toUpperCase() || 'UPI') : 'Payment Pending'}
+            {booking.paymentStatus === 'paid'
+              ? `${t('card.paidVia')} ${booking.paymentMethod?.toUpperCase() || 'UPI'}`
+              : t('card.paymentPending')}
           </span>
         </div>
       </div>
@@ -76,7 +80,7 @@ export const BookingCard: React.FC<BookingCardProps> = ({
             <div className="flex items-center gap-2 text-xs text-[#526058] mt-1">
               <User className="w-3.5 h-3.5 text-[#347653]" />
               <span>
-                {isOwnerView ? `Rented to: ${booking.renterName}` : `Owner: ${booking.ownerName}`}
+                {isOwnerView ? `${t('card.rentedTo')}: ${booking.renterName}` : `${t('card.owner')}: ${booking.ownerName}`}
               </span>
             </div>
           </div>
@@ -90,11 +94,11 @@ export const BookingCard: React.FC<BookingCardProps> = ({
           </div>
           <div className="flex items-center gap-1.5 text-[11px] text-[#7C8C83]">
             <Clock className="w-3.5 h-3.5" />
-            <span>{booking.durationHours} Hours duration</span>
+            <span>{booking.durationHours} {t('card.hoursDuration')}</span>
           </div>
           {booking.withOperator && (
             <span className="inline-block text-[10px] font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full">
-              Driver Included
+              {t('card.driverIncluded')}
             </span>
           )}
         </div>
@@ -106,7 +110,7 @@ export const BookingCard: React.FC<BookingCardProps> = ({
             <span>{isOwnerView ? booking.renterPhone : booking.ownerPhone}</span>
           </div>
           <p className="text-[11px] text-[#7C8C83]">
-            {isOwnerView ? booking.renterVillage : 'Village location confirmed'}
+            {isOwnerView ? booking.renterVillage : t('card.villageConfirmed')}
           </p>
         </div>
       </div>
@@ -120,7 +124,7 @@ export const BookingCard: React.FC<BookingCardProps> = ({
       <div className="pt-3 border-t border-[#E2E7DE] flex flex-wrap items-center justify-between gap-3">
         <Link to={`/booking/${booking.id}`}>
           <Button variant="ghost" size="sm" leftIcon={<FileText className="w-3.5 h-3.5" />}>
-            Booking Summary
+            {t('card.bookingSummary')}
           </Button>
         </Link>
 
@@ -133,7 +137,7 @@ export const BookingCard: React.FC<BookingCardProps> = ({
                   size="sm"
                   leftIcon={<Navigation className="w-3.5 h-3.5 animate-pulse" />}
                 >
-                  Live GPS Tracking
+                  {t('card.liveTracking')}
                 </Button>
               </Link>
               {onEndRental && (
@@ -143,7 +147,7 @@ export const BookingCard: React.FC<BookingCardProps> = ({
                   onClick={() => onEndRental(booking.id)}
                   leftIcon={<CheckCircle className="w-3.5 h-3.5 text-[#347653]" />}
                 >
-                  Complete Rental
+                  {t('card.completeRental')}
                 </Button>
               )}
             </>
@@ -156,7 +160,7 @@ export const BookingCard: React.FC<BookingCardProps> = ({
               onClick={() => onStartRental(booking.id)}
               leftIcon={<Play className="w-3.5 h-3.5" />}
             >
-              Start Rental Session
+              {t('card.startRental')}
             </Button>
           )}
 
@@ -167,7 +171,7 @@ export const BookingCard: React.FC<BookingCardProps> = ({
               onClick={() => onReview(booking)}
               leftIcon={<Star className="w-3.5 h-3.5 text-amber-500 fill-amber-400" />}
             >
-              Write Review
+              {t('card.writeReview')}
             </Button>
           )}
 
@@ -178,7 +182,7 @@ export const BookingCard: React.FC<BookingCardProps> = ({
               onClick={() => onCancelBooking(booking.id)}
               className="text-rose-600 hover:bg-rose-50"
             >
-              Cancel Booking
+              {t('card.cancelBooking')}
             </Button>
           )}
         </div>

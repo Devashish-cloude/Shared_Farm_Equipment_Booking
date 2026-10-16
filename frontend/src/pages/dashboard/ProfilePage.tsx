@@ -18,7 +18,7 @@ import { toast } from 'sonner';
 
 export const ProfilePage: React.FC = () => {
   const { user, updateUser } = useAuth();
-  const { setLanguage } = useLanguage();
+  const { setLanguage, t } = useLanguage();
 
   const [formData, setFormData] = useState({
     name: user?.name || 'Ramesh Patel',
@@ -63,7 +63,7 @@ export const ProfilePage: React.FC = () => {
     <div className="max-w-4xl mx-auto space-y-6">
       <div className="pb-4 border-b border-[#E2E7DE]">
         <h1 className="text-2xl font-extrabold text-[#164B35] font-heading">
-          Farmer Profile &amp; Farm Settings
+          {t('dash.profile')}
         </h1>
         <p className="text-xs text-[#526058] mt-1">
           Maintain your personal contact information, farm land parcel acreage, and verification credentials
@@ -141,10 +141,13 @@ export const ProfilePage: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-[#25312A] mb-1.5">Preferred Language</label>
+              <label className="block text-xs font-bold text-[#25312A] mb-1.5">{t('dash.language')}</label>
               <select
                 value={formData.preferredLanguage}
-                onChange={(e) => setFormData({ ...formData, preferredLanguage: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, preferredLanguage: e.target.value });
+                  setLanguage(e.target.value);
+                }}
                 className="w-full text-xs p-3 rounded-xl border border-[#CBD5C7] bg-[#F7F8F2] text-[#25312A]"
               >
                 <option value="English">English</option>
@@ -232,7 +235,7 @@ export const ProfilePage: React.FC = () => {
             isLoading={isSaving}
             leftIcon={<Save className="w-4 h-4" />}
           >
-            Save Profile Settings
+            {t('common.save')}
           </Button>
         </div>
       </form>

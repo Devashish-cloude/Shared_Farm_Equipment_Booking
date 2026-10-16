@@ -9,6 +9,7 @@ import { EquipmentCardSkeleton } from '../../components/ui/LoadingSkeleton';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { Button } from '../../components/ui/Button';
+import { useLanguage } from '../../context/LanguageContext';
 import {
   Search,
   MapPin,
@@ -21,6 +22,7 @@ import {
 } from 'lucide-react';
 
 export const MarketplacePage: React.FC = () => {
+  const { t } = useLanguage();
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Read initial query params from hero search
@@ -93,10 +95,10 @@ export const MarketplacePage: React.FC = () => {
         <div className="flex flex-col md:flex-row items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-[#164B35] font-heading">
-              Equipment Marketplace
+              {t('nav.explore')}
             </h1>
             <p className="text-xs text-[#526058] mt-1">
-              Browse and rent modern farm machinery with verified local owners
+              {t('feat.subtitle')}
             </p>
           </div>
 
@@ -164,7 +166,7 @@ export const MarketplacePage: React.FC = () => {
               onClick={() => setMobileFilterOpen(true)}
             >
               <SlidersHorizontal className="w-4 h-4 text-[#347653]" />
-              <span>Filters</span>
+              <span>{t('common.filters')}</span>
             </Button>
           </div>
         </div>

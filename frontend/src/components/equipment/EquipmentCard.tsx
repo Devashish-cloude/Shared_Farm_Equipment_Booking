@@ -5,6 +5,7 @@ import { StatusBadge } from '../ui/StatusBadge';
 import { RatingDisplay } from '../ui/RatingDisplay';
 import { PriceDisplay } from '../ui/PriceDisplay';
 import { Button } from '../ui/Button';
+import { useLanguage } from '../../context/LanguageContext';
 import { MapPin, UserCheck, Zap, ArrowRight, ShieldCheck } from 'lucide-react';
 
 interface EquipmentCardProps {
@@ -13,6 +14,7 @@ interface EquipmentCardProps {
 }
 
 export const EquipmentCard: React.FC<EquipmentCardProps> = ({ equipment, layout = 'grid' }) => {
+  const { t } = useLanguage();
   const [imgError, setImgError] = useState(false);
 
   const fallbackImage = 'https://images.unsplash.com/photo-1592982537447-7440770cbfc9?w=600&auto=format&fit=crop&q=70';
@@ -81,7 +83,7 @@ export const EquipmentCard: React.FC<EquipmentCardProps> = ({ equipment, layout 
               {equipment.operatorAvailable && (
                 <div className="flex items-center gap-1 text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full font-medium">
                   <UserCheck className="w-3 h-3" />
-                  <span>Driver Available</span>
+                  <span>{t('feat.withDriver')}</span>
                 </div>
               )}
             </div>
@@ -97,7 +99,7 @@ export const EquipmentCard: React.FC<EquipmentCardProps> = ({ equipment, layout 
 
             <Link to={`/equipment/${equipment.id}`}>
               <Button variant="primary" size="sm" rightIcon={<ArrowRight className="w-3.5 h-3.5" />}>
-                View Details
+                {t('feat.details')}
               </Button>
             </Link>
           </div>
@@ -167,7 +169,7 @@ export const EquipmentCard: React.FC<EquipmentCardProps> = ({ equipment, layout 
             </div>
             {equipment.operatorAvailable && (
               <span className="text-[10px] font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full">
-                + Driver
+                +{t('feat.withDriver')}
               </span>
             )}
           </div>
@@ -183,7 +185,7 @@ export const EquipmentCard: React.FC<EquipmentCardProps> = ({ equipment, layout 
 
           <Link to={`/equipment/${equipment.id}`}>
             <Button variant="primary" size="sm" rightIcon={<ArrowRight className="w-3.5 h-3.5" />}>
-              Details
+              {t('feat.details')}
             </Button>
           </Link>
         </div>

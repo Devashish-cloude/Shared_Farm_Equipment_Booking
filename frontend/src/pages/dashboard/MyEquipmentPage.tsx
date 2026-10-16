@@ -8,6 +8,7 @@ import { PriceDisplay } from '../../components/ui/PriceDisplay';
 import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
+import { useLanguage } from '../../context/LanguageContext';
 import {
   Tractor,
   PlusCircle,
@@ -24,6 +25,7 @@ import { toast } from 'sonner';
 
 export const MyEquipmentPage: React.FC = () => {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const [equipmentList, setEquipmentList] = useState<Equipment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -81,16 +83,16 @@ export const MyEquipmentPage: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#E2E7DE]">
         <div>
           <h1 className="text-2xl font-extrabold text-[#164B35] font-heading">
-            My Equipment (Machinery I Share)
+            {t('equip.title')}
           </h1>
           <p className="text-xs text-[#526058] mt-1">
-            Manage your listed tractors, implements, hourly pricing, and availability
+            {t('equip.subtitle')}
           </p>
         </div>
 
         <Link to="/dashboard/equipment/new">
           <Button variant="primary" size="md" leftIcon={<PlusCircle className="w-4 h-4 text-[#B8D96B]" />}>
-            + Add New Equipment
+            {t('equip.addBtn')}
           </Button>
         </Link>
       </div>
@@ -103,7 +105,7 @@ export const MyEquipmentPage: React.FC = () => {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Filter your listings..."
+            placeholder={`${t('common.search')}...`}
             className="w-full text-xs pl-9 pr-3 py-2 rounded-xl border border-[#CBD5C7] bg-[#F7F8F2] text-[#25312A] focus:outline-none focus:ring-2 focus:ring-[#164B35]"
           />
         </div>
@@ -136,14 +138,14 @@ export const MyEquipmentPage: React.FC = () => {
       {isLoading ? (
         <div className="text-center py-12 text-[#526058]">
           <div className="w-7 h-7 border-3 border-[#164B35] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-          <p className="text-xs">Loading your machinery...</p>
+          <p className="text-xs">{t('common.loading')}</p>
         </div>
       ) : filtered.length === 0 ? (
         <EmptyState
           icon={Tractor}
-          title="No Equipment Listed Yet"
-          description="You haven't listed any farm implements yet. List your tractor, harvester, or rotavator to start earning steady extra income."
-          actionText="+ List First Equipment"
+          title={t('equip.noEquipment')}
+          description={t('equip.noEquipmentDesc')}
+          actionText={t('equip.addBtn')}
           onAction={() => navigate('/dashboard/equipment/new')}
         />
       ) : viewMode === 'grid' ? (

@@ -5,6 +5,7 @@ import { StatusBadge } from '../../components/ui/StatusBadge';
 import { Button } from '../../components/ui/Button';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { EmptyState } from '../../components/ui/EmptyState';
+import { useLanguage } from '../../context/LanguageContext';
 import { formatCurrency, formatDate } from '../../lib/utils';
 import {
   Inbox,
@@ -21,6 +22,7 @@ import {
 import { toast } from 'sonner';
 
 export const BookingRequestsPage: React.FC = () => {
+  const { t } = useLanguage();
   const [requests, setRequests] = useState<Booking[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -47,7 +49,7 @@ export const BookingRequestsPage: React.FC = () => {
   const handleAccept = async (id: string) => {
     try {
       await bookingsService.acceptRequest(id);
-      toast.success('Booking request accepted! Renter notified to complete payment.');
+      toast.success(t('requests.acceptSuccess'));
       fetchRequests();
     } catch (err: any) {
       toast.error(err.message || 'Failed to accept request');
@@ -59,7 +61,7 @@ export const BookingRequestsPage: React.FC = () => {
     setIsRejecting(true);
     try {
       await bookingsService.rejectRequest(rejectId, reason || 'Equipment unavailable on requested dates');
-      toast.info('Booking request declined.');
+      toast.info(t('requests.declineSuccess'));
       setRejectId(null);
       fetchRequests();
     } catch (err: any) {
@@ -76,23 +78,23 @@ export const BookingRequestsPage: React.FC = () => {
     <div className="space-y-6">
       <div className="pb-4 border-b border-[#E2E7DE]">
         <h1 className="text-2xl font-extrabold text-[#164B35] font-heading">
-          Incoming Booking Requests
+          {t('requests.title')}
         </h1>
         <p className="text-xs text-[#526058] mt-1">
-          Approve or decline requests from farmers wishing to rent your listed machinery
+          {t('requests.subtitle')}
         </p>
       </div>
 
       {isLoading ? (
         <div className="text-center py-12 text-[#526058]">
           <div className="w-7 h-7 border-3 border-[#164B35] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-          <p className="text-xs">Loading booking requests...</p>
+          <p className="text-xs">{t('common.loading')}</p>
         </div>
       ) : requests.length === 0 ? (
         <EmptyState
           icon={Inbox}
-          title="No Requests Received Yet"
-          description="When farmers in your district request to book your machinery, their schedules and price proposals will show here."
+          title={t('requests.noRequests')}
+          description={t('requests.noRequestsDesc')}
         />
       ) : (
         <div className="space-y-8">
@@ -197,7 +199,7 @@ export const BookingRequestsPage: React.FC = () => {
                         leftIcon={<X className="w-4 h-4" />}
                         onClick={() => setRejectId(req.id)}
                       >
-                        Decline Request
+                        {t('requests.decline')}
                       </Button>
                       <Button
                         variant="primary"
@@ -205,7 +207,7 @@ export const BookingRequestsPage: React.FC = () => {
                         leftIcon={<Check className="w-4 h-4" />}
                         onClick={() => handleAccept(req.id)}
                       >
-                        Accept Booking Request
+                        {t('requests.accept')}
                       </Button>
                     </div>
                   </div>

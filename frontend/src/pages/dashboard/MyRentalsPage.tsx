@@ -6,6 +6,7 @@ import { ReviewModal } from '../../components/booking/ReviewModal';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { Button } from '../../components/ui/Button';
+import { useLanguage } from '../../context/LanguageContext';
 import { KeyRound, Search, Filter } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -13,6 +14,7 @@ import { toast } from 'sonner';
 type TabKey = 'all' | 'active' | 'upcoming' | 'completed' | 'cancelled';
 
 export const MyRentalsPage: React.FC = () => {
+  const { t } = useLanguage();
   const [rentals, setRentals] = useState<Booking[]>([]);
   const [activeTab, setActiveTab] = useState<TabKey>('all');
   const [isLoading, setIsLoading] = useState(true);
@@ -43,7 +45,7 @@ export const MyRentalsPage: React.FC = () => {
   const handleStartRental = async (id: string) => {
     try {
       await bookingsService.startRental(id);
-      toast.success('Rental started! Live telemetry tracking is active.');
+      toast.success(t('rentals.startSuccess'));
       fetchRentals();
     } catch (err: any) {
       toast.error(err.message || 'Failed to start rental');
@@ -53,7 +55,7 @@ export const MyRentalsPage: React.FC = () => {
   const handleEndRental = async (id: string) => {
     try {
       await bookingsService.endRental(id);
-      toast.success('Rental marked completed! You can now write a review.');
+      toast.success(t('rentals.endSuccess'));
       fetchRentals();
     } catch (err: any) {
       toast.error(err.message || 'Failed to complete rental');
@@ -65,7 +67,7 @@ export const MyRentalsPage: React.FC = () => {
     setIsCancelling(true);
     try {
       await bookingsService.cancelBooking(cancelBookingId, reason || 'Cancelled by renter');
-      toast.success('Booking cancelled. Security deposit refunded.');
+      toast.success(t('rentals.cancelSuccess'));
       setCancelBookingId(null);
       fetchRentals();
     } catch (err: any) {
@@ -98,15 +100,15 @@ export const MyRentalsPage: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#E2E7DE]">
         <div>
           <h1 className="text-2xl font-extrabold text-[#164B35] font-heading">
-            My Rentals (Machinery I Rented)
+            {t('rentals.title')}
           </h1>
           <p className="text-xs text-[#526058] mt-1">
-            Track booked equipment, active fieldwork sessions, and post-rental reviews
+            {t('rentals.subtitle')}
           </p>
         </div>
         <Link to="/equipment">
           <Button variant="primary" size="sm" leftIcon={<Search className="w-4 h-4" />}>
-            Find More Equipment
+            {t('rentals.findMore')}
           </Button>
         </Link>
       </div>
@@ -114,11 +116,11 @@ export const MyRentalsPage: React.FC = () => {
       {/* Tabs */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1 border-b border-[#E2E7DE]">
         {[
-          { key: 'all', label: 'All Rentals' },
-          { key: 'active', label: 'Active (In-Field)' },
-          { key: 'upcoming', label: 'Upcoming' },
-          { key: 'completed', label: 'Completed' },
-          { key: 'cancelled', label: 'Cancelled' },
+          { key: 'all', label: t('rentals.allRentals') },
+          { key: 'active', label: t('rentals.activeTab') },
+          { key: 'upcoming', label: t('rentals.upcomingTab') },
+          { key: 'completed', label: t('rentals.completedTab') },
+          { key: 'cancelled', label: t('rentals.cancelledTab') },
         ].map((tab) => {
           const count = tabCounts[tab.key as TabKey];
           const isSelected = activeTab === tab.key;
