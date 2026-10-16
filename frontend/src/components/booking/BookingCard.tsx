@@ -13,7 +13,6 @@ import {
   Phone,
   CheckCircle,
   Play,
-  RotateCcw,
   Star,
   FileText
 } from 'lucide-react';
@@ -87,7 +86,7 @@ export const BookingCard: React.FC<BookingCardProps> = ({
         <div className="space-y-1 text-xs text-[#526058]">
           <div className="flex items-center gap-1.5 font-medium text-[#25312A]">
             <Calendar className="w-3.5 h-3.5 text-[#347653]" />
-            <span>{formatDate(start)}</span>
+            <span>{formatDate(start)} – {formatDate(end)}</span>
           </div>
           <div className="flex items-center gap-1.5 text-[11px] text-[#7C8C83]">
             <Clock className="w-3.5 h-3.5" />

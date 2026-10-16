@@ -252,6 +252,30 @@ export class EquipmentController {
     });
   }
 
+  public static async getMyListings(
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    if (usePostgres()) {
+      try {
+        const results = await createEquipmentRepository().findByOwner(req.user!.id);
+        res.status(200).json({
+          success: true,
+          data: { equipment: results.map((result) => result.equipment) },
+        });
+      } catch (error) {
+        next(error);
+      }
+      return;
+    }
+    const list = store.getAllEquipment().filter((eq) => eq.owner_id === req.user!.id);
+    res.status(200).json({
+      success: true,
+      data: { equipment: list },
+    });
+  }
+
   public static async getCategories(
     _req: Request,
     res: Response,

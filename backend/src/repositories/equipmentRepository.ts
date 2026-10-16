@@ -179,6 +179,22 @@ export class EquipmentRepository {
       : undefined;
   }
 
+  public async findByOwner(
+    ownerId: string,
+    client: EquipmentQueryClient = this.pool
+  ): Promise<Array<{ equipment: Equipment; owner: { id: string; fullName: string } }>> {
+    const result = await client.query<EquipmentRow>(
+      `${equipmentSelect}
+       WHERE e.owner_id = $1
+       ORDER BY e.created_at DESC`,
+      [ownerId]
+    );
+    return result.rows.map((row) => ({
+      equipment: toEquipment(row),
+      owner: { id: row.owner_id, fullName: row.owner_full_name || '' },
+    }));
+  }
+
   public async create(
     equipment: Equipment,
     client: EquipmentQueryClient = this.pool

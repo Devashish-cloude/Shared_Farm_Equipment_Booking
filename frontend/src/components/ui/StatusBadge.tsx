@@ -14,7 +14,10 @@ export type StatusType =
   | 'maintenance'
   | 'paused'
   | 'draft'
-  | 'verified';
+  | 'verified'
+  | 'in_progress'
+  | 'confirmed'
+  | 'payment_pending';
 
 interface StatusBadgeProps {
   status: StatusType;
@@ -108,9 +111,30 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, className, sho
       border: 'border-[#B8D96B]',
       icon: <CheckCircle2 className="w-3.5 h-3.5 text-[#164B35]" />,
     },
+    in_progress: {
+      label: 'Active / In-Field',
+      bg: 'bg-blue-50',
+      text: 'text-blue-800',
+      border: 'border-blue-200',
+      icon: <PlayCircle className="w-3.5 h-3.5 text-blue-600 animate-pulse" />,
+    },
+    confirmed: {
+      label: 'Confirmed',
+      bg: 'bg-emerald-50',
+      text: 'text-emerald-800',
+      border: 'border-emerald-200',
+      icon: <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />,
+    },
+    payment_pending: {
+      label: 'Payment Pending',
+      bg: 'bg-amber-50',
+      text: 'text-amber-800',
+      border: 'border-amber-200',
+      icon: <Clock className="w-3.5 h-3.5 text-amber-600" />,
+    },
   };
 
-  const current = configs[status] || configs.pending;
+  const current = (configs as Record<string, typeof configs.pending>)[status] || configs.pending;
 
   return (
     <span

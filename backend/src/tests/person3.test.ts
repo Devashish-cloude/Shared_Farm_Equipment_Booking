@@ -13,7 +13,7 @@ const amitToken = jwt.sign(
   { id: 'user_amit', email: 'amit@example.com', full_name: 'Amit Patel', is_admin: false },
   config.jwtSecret
 );
-const rahulToken = jwt.sign(
+const _rahulToken = jwt.sign(
   { id: 'user_rahul', email: 'rahul@example.com', full_name: 'Rahul Sharma', is_admin: false },
   config.jwtSecret
 );

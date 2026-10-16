@@ -15,7 +15,15 @@ interface EquipmentCardProps {
 export const EquipmentCard: React.FC<EquipmentCardProps> = ({ equipment, layout = 'grid' }) => {
   const [imgError, setImgError] = useState(false);
 
-  const fallbackImage = 'https://images.unsplash.com/photo-1592982537447-7440770cbfc9?w=800&auto=format&fit=crop&q=80';
+  const fallbackImage = 'https://images.unsplash.com/photo-1592982537447-7440770cbfc9?w=600&auto=format&fit=crop&q=70';
+
+  const getOptimizedImageUrl = (url?: string) => {
+    if (!url) return fallbackImage;
+    if (url.includes('images.unsplash.com') && url.includes('w=')) {
+      return url.replace(/w=\d+/, 'w=600').replace(/q=\d+/, 'q=70');
+    }
+    return url;
+  };
 
   if (layout === 'list') {
     return (
@@ -23,9 +31,13 @@ export const EquipmentCard: React.FC<EquipmentCardProps> = ({ equipment, layout 
         {/* Image */}
         <div className="w-full sm:w-56 h-48 sm:h-auto rounded-xl overflow-hidden shrink-0 relative bg-[#F0F5F2]">
           <img
-            src={imgError || !equipment.images[0] ? fallbackImage : equipment.images[0]}
+            src={imgError || !equipment.images[0] ? fallbackImage : getOptimizedImageUrl(equipment.images[0])}
             alt={equipment.title}
             onError={() => setImgError(true)}
+            loading="lazy"
+            decoding="async"
+            width={400}
+            height={240}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
           />
           <div className="absolute top-2.5 left-2.5">
@@ -100,9 +112,13 @@ export const EquipmentCard: React.FC<EquipmentCardProps> = ({ equipment, layout 
       {/* Card Header Image */}
       <div className="w-full h-48 relative overflow-hidden bg-[#F0F5F2]">
         <img
-          src={imgError || !equipment.images[0] ? fallbackImage : equipment.images[0]}
+          src={imgError || !equipment.images[0] ? fallbackImage : getOptimizedImageUrl(equipment.images[0])}
           alt={equipment.title}
           onError={() => setImgError(true)}
+          loading="lazy"
+          decoding="async"
+          width={400}
+          height={240}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
         />
         <div className="absolute top-3 left-3">
