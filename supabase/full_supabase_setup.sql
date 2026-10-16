@@ -656,13 +656,25 @@ DROP POLICY IF EXISTS "Participants can update booking status according to role"
 CREATE POLICY "Participants can update booking status according to role"
     ON public.bookings FOR UPDATE
     USING (auth.uid() = renter_id OR auth.uid() = owner_id)
-    WITH CHECK (
-        -- Disallow altering participant identities or foreign keys during updates
-        renter_id = OLD.renter_id 
-        AND owner_id = OLD.owner_id
-        AND equipment_id = OLD.equipment_id
-        AND (auth.uid() = renter_id OR auth.uid() = owner_id)
-    );
+    WITH CHECK (auth.uid() = renter_id OR auth.uid() = owner_id);
+
+-- Disallow altering participant identities or equipment references during updates via trigger
+CREATE OR REPLACE FUNCTION public.prevent_booking_identity_tamper()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.renter_id IS DISTINCT FROM OLD.renter_id 
+       OR NEW.owner_id IS DISTINCT FROM OLD.owner_id 
+       OR NEW.equipment_id IS DISTINCT FROM OLD.equipment_id THEN
+        RAISE EXCEPTION 'Cannot modify booking participants or equipment reference during an update.';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_prevent_booking_identity_tamper ON public.bookings;
+CREATE TRIGGER trg_prevent_booking_identity_tamper
+    BEFORE UPDATE ON public.bookings
+    FOR EACH ROW EXECUTE FUNCTION public.prevent_booking_identity_tamper();
 
 
 -- 6. Strict Rental Tracking RLS
