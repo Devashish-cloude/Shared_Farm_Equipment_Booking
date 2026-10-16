@@ -84,7 +84,7 @@ export const ProfilePage: React.FC = () => {
     setIsUploadingAvatar(true);
     try {
       if (isSupabaseConfigured() && user) {
-        const uploadRes = await storageService.uploadEquipmentImage(file, user.id);
+        const uploadRes = await storageService.uploadAvatar(file, user.id);
         setFormData((prev) => ({ ...prev, avatar: uploadRes.url }));
         await updateUser({ avatar: uploadRes.url });
         toast.success('Profile photo uploaded and saved!');

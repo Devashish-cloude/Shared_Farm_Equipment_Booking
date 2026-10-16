@@ -278,4 +278,29 @@ export const authService = {
     }
     return mockStore.updateUser(updates);
   },
+
+  async resetPassword(email: string): Promise<void> {
+    const cleanEmail = email.trim();
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      throw new Error('Please enter a valid email address.');
+    }
+
+    if (isSupabaseConfigured()) {
+      const redirectTo = typeof window !== 'undefined'
+        ? `${window.location.origin}/login`
+        : undefined;
+
+      const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
+        redirectTo,
+      });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+      return;
+    }
+
+    // Demo/Offline mode fallback
+    await new Promise((r) => setTimeout(r, 400));
+  },
 };

@@ -2,19 +2,31 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Sprout, Mail, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
+import { authService } from '../../services/auth.service';
+import { toast } from 'sonner';
 
 export const ForgotPasswordPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!email.trim()) {
+      toast.error('Please enter your registered email address.');
+      return;
+    }
+
     setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      await authService.resetPassword(email.trim());
       setSubmitted(true);
-    }, 600);
+      toast.success('Password recovery link sent successfully!');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to send recovery instructions');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

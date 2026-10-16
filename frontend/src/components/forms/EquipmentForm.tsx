@@ -8,7 +8,7 @@ import { Plus, Trash2, Image as ImageIcon, Sparkles, MapPin, Wrench, Upload } fr
 import { storageService } from '../../services/storage.service';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
-import { isSupabaseConfigured } from '../../lib/supabase';
+import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { getEquipmentCategoryPlaceholder } from '../../lib/equipmentImages';
 import { INDIAN_STATES_DISTRICTS } from '../../lib/indianLocations';
 import { toast } from 'sonner';
@@ -138,8 +138,13 @@ export const EquipmentForm: React.FC<EquipmentFormProps> = ({
 
     setIsUploading(true);
     try {
-      const userId = user?.id || 'farmer_user';
       if (isSupabaseConfigured()) {
+        const sessionRes = await supabase.auth.getSession();
+        const userId = user?.id || sessionRes.data.session?.user?.id;
+        if (!userId) {
+          toast.error('Please sign in to upload equipment photos.');
+          return;
+        }
         const res = await storageService.uploadEquipmentImage(file, userId);
         setImages((prev) => [...prev.filter((img) => !img.includes('images.unsplash.com/photo-1592982537447')), res.url]);
         toast.success('Equipment photo uploaded successfully!');

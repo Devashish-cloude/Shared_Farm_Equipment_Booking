@@ -184,6 +184,43 @@ export const bookingsService = {
     });
 
     if (rpcError) {
+      if (
+        rpcError.message.includes('function') &&
+        (rpcError.message.includes('does not exist') || rpcError.message.includes('Could not find'))
+      ) {
+        const insertPayload = {
+          equipment_id: bookingData.equipmentId,
+          renter_id: sessionData.session.user.id,
+          owner_id: bookingData.ownerId,
+          start_date: bookingData.startDate,
+          end_date: bookingData.endDate,
+          duration_hours: bookingData.durationHours,
+          with_operator: Boolean(bookingData.withOperator),
+          base_price: bookingData.basePrice,
+          operator_price: bookingData.operatorPrice,
+          platform_fee: bookingData.platformFee,
+          security_deposit: bookingData.securityDeposit,
+          total_price: bookingData.totalPrice,
+          status: 'pending',
+          payment_status: 'pending',
+          payment_method: bookingData.paymentMethod || 'upi',
+          renter_notes: bookingData.renterNotes || null,
+        };
+
+        const { data: inserted, error: insertErr } = await supabase
+          .from('bookings')
+          .insert(insertPayload)
+          .select(`
+            *,
+            equipment:equipment_id(id, title, name, category, images, image_urls),
+            renter:renter_id(id, full_name, phone, village),
+            owner:owner_id(id, full_name, phone)
+          `)
+          .single();
+
+        if (insertErr) throw new Error(insertErr.message);
+        return mapSupabaseBooking(inserted);
+      }
       throw new Error(rpcError.message);
     }
 
