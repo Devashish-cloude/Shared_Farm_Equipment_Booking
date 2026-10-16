@@ -124,7 +124,7 @@ export const ProfilePage: React.FC = () => {
         },
         farmDetails: {
           farmSizeAcres: Number(formData.farmSizeAcres) || undefined,
-          primaryCrops: formData.primaryCrops
+          primaryCrops: (formData.primaryCrops || '')
             .split(',')
             .map((s) => s.trim())
             .filter(Boolean),

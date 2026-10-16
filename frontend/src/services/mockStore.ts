@@ -81,7 +81,17 @@ class MockDataStore {
     const raw = sessionStorage.getItem('sf_active_user');
     if (raw) {
       try {
-        return JSON.parse(raw);
+        const parsed = JSON.parse(raw);
+        if (!parsed) return null;
+        return {
+          ...parsed,
+          name: parsed.name || (parsed as any).fullName || (parsed.email ? parsed.email.split('@')[0] : '') || 'Farmer',
+          location: parsed.location || {
+            village: (parsed as any).village || 'Farm Village',
+            district: (parsed as any).district || 'District',
+            state: (parsed as any).state || 'Maharashtra',
+          },
+        };
       } catch {
         return null;
       }
@@ -104,7 +114,7 @@ class MockDataStore {
       email: data.email || 'farmer@sharedfarm.local',
       phone: data.phone || '',
       avatar: data.avatar || '',
-      location: data.location || { village: '', district: '', state: '' },
+      location: data.location || { village: 'Farm Village', district: 'District', state: 'Maharashtra' },
       verificationStatus: 'unverified',
       memberSince: new Date().getFullYear().toString(),
       preferredLanguage: data.preferredLanguage || 'English',
@@ -119,7 +129,14 @@ class MockDataStore {
 
   // User (Legacy fallback)
   public getUser(): User {
-    return this.getActiveUser() || this.user;
+    const active = this.getActiveUser();
+    if (active) return active;
+    const fallback = this.user || CURRENT_USER;
+    return {
+      ...fallback,
+      name: fallback.name || (fallback as any).fullName || 'Farmer',
+      location: fallback.location || { village: 'Farm Village', district: 'District', state: 'Gujarat' },
+    };
   }
 
   public updateUser(updates: Partial<User>): User {

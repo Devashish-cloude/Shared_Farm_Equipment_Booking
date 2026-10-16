@@ -204,7 +204,7 @@ export const UnifiedCalendarPage: React.FC = () => {
                         title={`${ev.equipmentName} (${ev.durationHours} hrs)`}
                       >
                         {isMyRental ? '🚜 Renting: ' : '📥 Booked: '}
-                        {ev.equipmentName.split(' ')[0]}
+                        {(ev.equipmentName || 'Equipment').split(' ')[0]}
                       </button>
                     );
                   })}

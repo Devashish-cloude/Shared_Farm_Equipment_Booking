@@ -16,28 +16,47 @@ export const setDemoModeActive = (active: boolean): void => {
 };
 
 export function mapProfileToUser(authUser: any, profile?: any): User {
-  const meta = authUser.user_metadata || {};
+  const effectiveAuth = authUser && (authUser.id || authUser.email) ? authUser : {};
+  const effectiveProfile = (profile && typeof profile === 'object') ? profile : (effectiveAuth.user_metadata ? {} : authUser);
+  const meta = effectiveAuth.user_metadata || {};
+
+  const name =
+    effectiveProfile?.full_name ||
+    effectiveProfile?.name ||
+    effectiveProfile?.fullName ||
+    meta.full_name ||
+    meta.name ||
+    (effectiveAuth.email ? String(effectiveAuth.email).split('@')[0] : '') ||
+    'Farmer';
+
+  const email =
+    effectiveAuth.email ||
+    effectiveProfile?.email ||
+    '';
+
+  const location = {
+    village: effectiveProfile?.village || meta.village || 'Farm Village',
+    district: effectiveProfile?.district || meta.district || 'District',
+    state: effectiveProfile?.state || meta.state || 'Maharashtra',
+  };
+
   return {
-    id: authUser.id,
-    name: profile?.full_name || meta.full_name || meta.name || authUser.email?.split('@')[0] || 'Farmer',
-    email: authUser.email || profile?.email || '',
-    phone: profile?.phone || meta.phone || '',
-    avatar: profile?.avatar_url || meta.avatar_url || undefined,
-    location: {
-      village: profile?.village || meta.village || '',
-      district: profile?.district || meta.district || '',
-      state: profile?.state || meta.state || '',
-    },
-    verificationStatus: profile?.verification_status || 'unverified',
-    memberSince: profile?.created_at ? new Date(profile.created_at).getFullYear().toString() : '2026',
+    id: effectiveAuth.id || effectiveProfile?.id || `usr-${Date.now()}`,
+    name,
+    email,
+    phone: effectiveProfile?.phone || meta.phone || '',
+    avatar: effectiveProfile?.avatar_url || effectiveProfile?.avatar || meta.avatar_url || undefined,
+    location,
+    verificationStatus: effectiveProfile?.verification_status || 'verified',
+    memberSince: effectiveProfile?.created_at ? new Date(effectiveProfile.created_at).getFullYear().toString() : '2026',
     farmDetails: {
-      farmSizeAcres: profile?.farm_size_acres ? Number(profile.farm_size_acres) : undefined,
-      primaryCrops: profile?.primary_crops || [],
+      farmSizeAcres: effectiveProfile?.farm_size_acres ? Number(effectiveProfile.farm_size_acres) : undefined,
+      primaryCrops: effectiveProfile?.primary_crops || [],
     },
-    preferredLanguage: profile?.preferred_language || 'English',
-    rating: profile?.rating ? Number(profile.rating) : 5.0,
-    reviewCount: profile?.review_count ? Number(profile.review_count) : 0,
-    role: profile?.role === 'administrator' ? 'admin' : 'user',
+    preferredLanguage: effectiveProfile?.preferred_language || 'English',
+    rating: effectiveProfile?.rating ? Number(effectiveProfile.rating) : 5.0,
+    reviewCount: effectiveProfile?.review_count ? Number(effectiveProfile.review_count) : 0,
+    role: (effectiveProfile?.role === 'administrator' || effectiveProfile?.role === 'admin') ? 'admin' : 'user',
   };
 }
 
@@ -75,8 +94,10 @@ export const authService = {
     }
 
     try {
-      const res = await apiClient.get<User>('/auth/me');
-      return res.data;
+      const res = await apiClient.get<any>('/auth/me');
+      const rawUser = res.data?.data?.user || res.data?.data || res.data?.user || res.data;
+      if (!rawUser || !rawUser.id) return null;
+      return mapProfileToUser({ id: rawUser.id, email: rawUser.email }, rawUser);
     } catch {
       return null;
     }
@@ -142,12 +163,14 @@ export const authService = {
       return user;
     }
 
-    const res = await apiClient.post<{ token: string; user: User }>('/auth/login', {
+    const res = await apiClient.post<any>('/auth/login', {
       email,
       password,
     });
-    localStorage.setItem('shared_farm_token', res.data.token);
-    return res.data.user;
+    const token = res.data?.token || res.data?.data?.token;
+    if (token) localStorage.setItem('shared_farm_token', token);
+    const rawUser = res.data?.data?.user || res.data?.user || res.data;
+    return mapProfileToUser({ id: rawUser?.id, email: rawUser?.email || email }, rawUser);
   },
 
   async register(userData: Partial<User> & { password?: string }): Promise<User> {
@@ -208,9 +231,11 @@ export const authService = {
       return newUser;
     }
 
-    const res = await apiClient.post<{ token: string; user: User }>('/auth/register', userData);
-    localStorage.setItem('shared_farm_token', res.data.token);
-    return res.data.user;
+    const res = await apiClient.post<any>('/auth/register', userData);
+    const token = res.data?.token || res.data?.data?.token;
+    if (token) localStorage.setItem('shared_farm_token', token);
+    const rawUser = res.data?.data?.user || res.data?.user || res.data;
+    return mapProfileToUser({ id: rawUser?.id, email: rawUser?.email || userData.email }, rawUser);
   },
 
   async logout(): Promise<void> {
@@ -249,7 +274,7 @@ export const authService = {
         throw new Error(`Profile update failed: ${error.message}`);
       }
       const authUser = (await supabase.auth.getUser()).data.user;
-      return mapProfileToUser(data, authUser?.email || '');
+      return mapProfileToUser(authUser || { id: userId, email: updates.email }, data);
     }
     return mockStore.updateUser(updates);
   },

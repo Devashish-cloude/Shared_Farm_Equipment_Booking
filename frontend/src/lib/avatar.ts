@@ -8,7 +8,7 @@ export function getAvatarUrl(avatarUrl?: string | null, name?: string): string {
     return avatarUrl.trim();
   }
 
-  const cleanName = (name || 'Farmer').trim();
+  const cleanName = String(name || 'Farmer').trim();
   const parts = cleanName.split(' ').filter(Boolean);
   let initials = 'SF';
   if (parts.length >= 2) {

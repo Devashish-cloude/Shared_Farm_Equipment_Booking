@@ -41,6 +41,16 @@ export const Navbar: React.FC = () => {
     navigate('/');
   };
 
+  const displayName =
+    user?.name ||
+    (user as any)?.fullName ||
+    (user?.email ? user.email.split('@')[0] : '') ||
+    'Farmer';
+  const displayLocation =
+    user?.location?.village
+      ? `${user.location.village}${user.location.district ? `, ${user.location.district}` : ''}`
+      : 'Local Farm';
+
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-[#E2E7DE] transition-all">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -147,13 +157,13 @@ export const Navbar: React.FC = () => {
                     className="flex items-center gap-2.5 p-1.5 pr-3 rounded-full border border-[#E2E7DE] hover:border-[#164B35] bg-white transition-all shadow-xs"
                   >
                     <img
-                      src={getAvatarUrl(user.avatar, user.name)}
-                      alt={user.name}
+                      src={getAvatarUrl(user.avatar, displayName)}
+                      alt={displayName}
                       className="w-8 h-8 rounded-full object-cover ring-2 ring-[#B8D96B]"
                     />
                     <div className="text-left">
                       <span className="block text-xs font-bold text-[#25312A] leading-tight">
-                        {user.name.split(' ')[0]}
+                        {displayName.split(' ')[0]}
                       </span>
                       <span className="block text-[10px] text-[#526058]">Farmer Account</span>
                     </div>
@@ -163,10 +173,10 @@ export const Navbar: React.FC = () => {
                   {profileMenuOpen && (
                     <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-[#E2E7DE] py-2 z-50 animate-in fade-in zoom-in-95 duration-150">
                       <div className="px-4 py-2 border-b border-[#E2E7DE]">
-                        <p className="text-xs font-bold text-[#25312A]">{user.name}</p>
-                        <p className="text-[11px] text-[#526058] truncate">{user.email}</p>
+                        <p className="text-xs font-bold text-[#25312A]">{displayName}</p>
+                        <p className="text-[11px] text-[#526058] truncate">{user.email || ''}</p>
                         <p className="text-[10px] text-[#347653] font-semibold mt-0.5">
-                          {user.location.village}, {user.location.district}
+                          {displayLocation}
                         </p>
                       </div>
 
@@ -309,13 +319,13 @@ export const Navbar: React.FC = () => {
               <div className="space-y-3">
                 <div className="flex items-center gap-3 px-3 py-2 bg-[#F7F8F2] rounded-xl">
                   <img
-                    src={getAvatarUrl(user.avatar, user.name)}
-                    alt={user.name}
+                    src={getAvatarUrl(user.avatar, displayName)}
+                    alt={displayName}
                     className="w-10 h-10 rounded-full object-cover"
                   />
                   <div>
-                    <p className="text-sm font-bold text-[#25312A]">{user.name}</p>
-                    <p className="text-xs text-[#526058]">{user.location.village}, {user.location.district}</p>
+                    <p className="text-sm font-bold text-[#25312A]">{displayName}</p>
+                    <p className="text-xs text-[#526058]">{displayLocation}</p>
                   </div>
                 </div>
 

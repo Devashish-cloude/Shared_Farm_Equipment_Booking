@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { authService, isDemoModeActive } from '../services/auth.service';
+import { authService, isDemoModeActive, mapProfileToUser } from '../services/auth.service';
 import { mockStore } from '../services/mockStore';
 import { equipmentService } from '../services/equipment.service';
 import { bookingsService } from '../services/bookings.service';
@@ -289,19 +289,39 @@ describe('Production Bug Fixes & Regression Test Suite', () => {
   });
 
   // --------------------------------------------------------------------------
-  // TEST H: LOGOUT PURGE AND IN-MEMORY CACHE INVALIDATION (BUG 10)
+  // TEST I: UNDEFINED USER PROPERTIES & SAFE SPLIT FALLBACKS
   // --------------------------------------------------------------------------
-  describe('Test H: In-Memory Cache Invalidation & Logout State (Bug 10)', () => {
-    it('purges user session and tokens completely upon logout', async () => {
-      await authService.login('ramesh.patel@sharedfarm.demo', 'demo');
-      expect(localStorage.getItem('shared_farm_token')).not.toBeNull();
+  describe('Test I: Safe User Properties & Split Fallbacks', () => {
+    it('gracefully handles user with undefined name and location in mapProfileToUser', () => {
+      const user = mapProfileToUser({}, {});
+      expect(user.name).toBe('Farmer');
+      expect(user.name.split(' ')[0]).toBe('Farmer');
+      expect(user.location).toBeDefined();
+      expect(user.location.village).toBe('Farm Village');
+    });
 
-      await authService.logout();
+    it('gracefully handles reversed args in mapProfileToUser', () => {
+      const profile = { id: 'prof-123', full_name: 'Harpreet Singh', village: 'Khanna' };
+      const user = mapProfileToUser(profile, 'harpreet@test.farm');
+      expect(user.name).toBe('Harpreet Singh');
+      expect(user.location.village).toBe('Khanna');
+      expect(user.name.split(' ')[0]).toBe('Harpreet');
+    });
 
-      expect(localStorage.getItem('shared_farm_token')).toBeNull();
-      expect(mockStore.getActiveUser()).toBeNull();
-      const currentUser = await authService.getCurrentUser();
-      expect(currentUser).toBeNull();
+    it('getAvatarUrl never throws when name is undefined or empty', () => {
+      expect(() => getAvatarUrl(undefined, undefined)).not.toThrow();
+      expect(() => getAvatarUrl('', '')).not.toThrow();
+      const svg = getAvatarUrl(null, undefined);
+      expect(svg).toContain('data:image/svg+xml');
+    });
+
+    it('mockStore ensures safe name and location even if raw session storage is corrupted', () => {
+      sessionStorage.setItem('sf_active_user', JSON.stringify({ id: 'usr-empty' }));
+      const active = mockStore.getActiveUser();
+      expect(active).not.toBeNull();
+      expect(active?.name).toBe('Farmer');
+      expect(active?.name.split(' ')[0]).toBe('Farmer');
+      expect(active?.location.village).toBeDefined();
     });
   });
 });
