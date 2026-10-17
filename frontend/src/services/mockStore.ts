@@ -76,9 +76,18 @@ class MockDataStore {
     this.resetToDefaults();
   }
 
+  public getRegisteredUsers(): User[] {
+    try {
+      const raw = localStorage.getItem('sf_registered_users');
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  }
+
   // Active User Session Management (Ensures account isolation)
   public getActiveUser(): User | null {
-    const raw = sessionStorage.getItem('sf_active_user');
+    const raw = sessionStorage.getItem('sf_active_user') || localStorage.getItem('sf_active_user');
     if (raw) {
       try {
         const parsed = JSON.parse(raw);
@@ -102,8 +111,19 @@ class MockDataStore {
   public setActiveUser(user: User | null): void {
     if (user) {
       sessionStorage.setItem('sf_active_user', JSON.stringify(user));
+      localStorage.setItem('sf_active_user', JSON.stringify(user));
+      try {
+        const list = this.getRegisteredUsers().filter(
+          (u) => (u.email || '').toLowerCase() !== (user.email || '').toLowerCase()
+        );
+        list.push(user);
+        localStorage.setItem('sf_registered_users', JSON.stringify(list));
+      } catch (e) {
+        console.warn('Failed to save to registered users list', e);
+      }
     } else {
       sessionStorage.removeItem('sf_active_user');
+      localStorage.removeItem('sf_active_user');
     }
   }
 

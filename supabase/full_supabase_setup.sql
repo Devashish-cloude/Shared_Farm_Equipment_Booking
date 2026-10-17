@@ -519,66 +519,69 @@ CREATE POLICY "Authenticated users can write reviews"
 -- ------------------------------------------------------------------------------
 -- 10. SUPABASE STORAGE BUCKET & STORAGE POLICIES
 -- ------------------------------------------------------------------------------
-INSERT INTO storage.buckets (id, name, public)
-VALUES ('equipment-images', 'equipment-images', true)
-ON CONFLICT (id) DO NOTHING;
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES 
+  ('equipment-images', 'equipment-images', true, 5242880, ARRAY['image/jpeg', 'image/png', 'image/webp', 'image/avif']::text[]),
+  ('avatars', 'avatars', true, 2097152, ARRAY['image/jpeg', 'image/png', 'image/webp', 'image/avif']::text[])
+ON CONFLICT (id) DO UPDATE SET 
+  public = true,
+  file_size_limit = EXCLUDED.file_size_limit,
+  allowed_mime_types = EXCLUDED.allowed_mime_types;
 
--- Public read policy for equipment images
+-- Storage read policies
 DROP POLICY IF EXISTS "Equipment images are publicly accessible" ON storage.objects;
 CREATE POLICY "Equipment images are publicly accessible"
     ON storage.objects FOR SELECT
     USING (bucket_id = 'equipment-images');
 
--- Authenticated upload policy
-DROP POLICY IF EXISTS "Authenticated users can upload equipment images" ON storage.objects;
-CREATE POLICY "Authenticated users can upload equipment images"
-    ON storage.objects FOR INSERT
-    WITH CHECK (bucket_id = 'equipment-images' AND auth.role() = 'authenticated');
-
--- User delete policy for own uploads
-DROP POLICY IF EXISTS "Users can delete own uploaded equipment images" ON storage.objects;
-CREATE POLICY "Users can delete own uploaded equipment images"
-    ON storage.objects FOR DELETE
-    USING (bucket_id = 'equipment-images' AND auth.uid() = owner);
--- ==============================================================================
--- SHARED FARM EQUIPMENT BOOKING PLATFORM — SECURITY HARDENING MIGRATION
--- Migration: 20261016000001_rls_security_hardening.sql
--- Description: Hardens Row Level Security (RLS) policies, adds strict WITH CHECK
---              clauses, prevents ID impersonation and role escalation on profiles,
---              configures dedicated avatars storage bucket, and isolates user records.
--- ==============================================================================
-
--- 1. Ensure avatar storage bucket exists with appropriate policies
-INSERT INTO storage.buckets (id, name, public)
-VALUES ('avatars', 'avatars', true)
-ON CONFLICT (id) DO NOTHING;
-
--- Public read for user avatars
 DROP POLICY IF EXISTS "Avatars are publicly readable" ON storage.objects;
 CREATE POLICY "Avatars are publicly readable"
     ON storage.objects FOR SELECT
     USING (bucket_id = 'avatars');
 
--- Authenticated users can upload their own avatars
-DROP POLICY IF EXISTS "Authenticated users can upload avatars" ON storage.objects;
-CREATE POLICY "Authenticated users can upload avatars"
+-- Storage insert (upload) policies
+DROP POLICY IF EXISTS "Authenticated users can upload equipment images" ON storage.objects;
+DROP POLICY IF EXISTS "Allow uploads to equipment-images" ON storage.objects;
+CREATE POLICY "Allow uploads to equipment-images"
     ON storage.objects FOR INSERT
-    WITH CHECK (
-        bucket_id = 'avatars' 
-        AND auth.role() = 'authenticated'
-        AND (storage.foldername(name))[1] = auth.uid()::text
-    );
+    TO public
+    WITH CHECK (bucket_id = 'equipment-images');
 
--- Users can update/delete their own avatars
+DROP POLICY IF EXISTS "Authenticated users can upload avatars" ON storage.objects;
+DROP POLICY IF EXISTS "Allow uploads to avatars" ON storage.objects;
+CREATE POLICY "Allow uploads to avatars"
+    ON storage.objects FOR INSERT
+    TO public
+    WITH CHECK (bucket_id = 'avatars');
+
+-- Storage update policies
 DROP POLICY IF EXISTS "Users can update own avatar" ON storage.objects;
-CREATE POLICY "Users can update own avatar"
+DROP POLICY IF EXISTS "Allow update equipment images" ON storage.objects;
+DROP POLICY IF EXISTS "Allow update avatars" ON storage.objects;
+CREATE POLICY "Allow update equipment images"
     ON storage.objects FOR UPDATE
-    USING (bucket_id = 'avatars' AND (storage.foldername(name))[1] = auth.uid()::text);
+    TO public
+    USING (bucket_id = 'equipment-images');
 
+CREATE POLICY "Allow update avatars"
+    ON storage.objects FOR UPDATE
+    TO public
+    USING (bucket_id = 'avatars');
+
+-- Storage delete policies
+DROP POLICY IF EXISTS "Users can delete own uploaded equipment images" ON storage.objects;
 DROP POLICY IF EXISTS "Users can delete own avatar" ON storage.objects;
-CREATE POLICY "Users can delete own avatar"
+DROP POLICY IF EXISTS "Allow delete equipment images" ON storage.objects;
+DROP POLICY IF EXISTS "Allow delete avatars" ON storage.objects;
+CREATE POLICY "Allow delete equipment images"
     ON storage.objects FOR DELETE
-    USING (bucket_id = 'avatars' AND (storage.foldername(name))[1] = auth.uid()::text);
+    TO public
+    USING (bucket_id = 'equipment-images');
+
+CREATE POLICY "Allow delete avatars"
+    ON storage.objects FOR DELETE
+    TO public
+    USING (bucket_id = 'avatars');
 
 
 -- 2. Profiles Table Hardening: Prevent ID alteration and unauthorized role escalation

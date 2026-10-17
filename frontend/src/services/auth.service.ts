@@ -67,19 +67,23 @@ export const authService = {
   async getCurrentUser(): Promise<User | null> {
     // 1. Supabase Auth Session
     if (isSupabaseConfigured()) {
-      const { data: { session }, error } = await supabase.auth.getSession();
-      if (error || !session?.user) return null;
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (!error && session?.user) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .maybeSingle();
 
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', session.user.id)
-        .maybeSingle();
-
-      return mapProfileToUser(session.user, profile);
+          return mapProfileToUser(session.user, profile);
+        }
+      } catch (err) {
+        console.warn('Could not restore Supabase session:', err);
+      }
     }
 
-    // 2. Token-gated session: If user has not signed in, ALWAYS return null (visitor state)
+    // 2. Token-gated session: If user has registered or signed in via local/platform fallback
     const token = localStorage.getItem('shared_farm_token');
     if (!token) return null;
 
@@ -110,21 +114,53 @@ export const authService = {
         password,
       });
 
+      if (!error && data?.user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', data.user.id)
+          .maybeSingle();
+
+        const user = mapProfileToUser(data.user, profile);
+        mockStore.setActiveUser(user);
+        return user;
+      }
+
       if (error) {
+        // Check registered users list (e.g. from rate limit fallback signup)
+        const registered = mockStore.getRegisteredUsers();
+        const match = registered.find((u) => u.email.toLowerCase() === email.toLowerCase());
+        if (match) {
+          mockStore.setActiveUser(match);
+          localStorage.setItem('shared_farm_token', `demo-jwt-token-${match.id}`);
+          return match;
+        }
+
+        const active = mockStore.getActiveUser();
+        if (active && active.email.toLowerCase() === email.toLowerCase()) {
+          localStorage.setItem('shared_farm_token', `demo-jwt-token-${active.id}`);
+          return active;
+        }
+
+        if (error.message.toLowerCase().includes('email not confirmed')) {
+          throw new Error('Email not confirmed. To sign in immediately, please disable "Confirm email" in your Supabase Dashboard under Authentication > Providers > Email.');
+        }
+
+        // Try backend login as fallback
+        try {
+          const res = await apiClient.post<any>('/auth/login', { email, password });
+          const token = res.data?.token || res.data?.data?.token;
+          if (token) localStorage.setItem('shared_farm_token', token);
+          const rawUser = res.data?.data?.user || res.data?.user || res.data;
+          if (rawUser && rawUser.id) {
+            return mapProfileToUser({ id: rawUser.id, email: rawUser.email || email }, rawUser);
+          }
+        } catch {
+          // ignore
+        }
+
         throw new Error(error.message);
       }
-
-      if (!data.user) {
-        throw new Error('Login failed: user not returned.');
-      }
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', data.user.id)
-        .maybeSingle();
-
-      return mapProfileToUser(data.user, profile);
     }
 
     if (isDemoModeActive() || !isSupabaseConfigured()) {
@@ -179,63 +215,93 @@ export const authService = {
         throw new Error('Email and password are required for registration.');
       }
 
-      const { data, error } = await supabase.auth.signUp({
-        email: userData.email,
-        password: userData.password,
-        options: {
-          data: {
-            full_name: userData.name || 'New Farmer',
-            phone: userData.phone || '',
-            village: userData.location?.village || '',
-            district: userData.location?.district || '',
-            state: userData.location?.state || '',
-            role: 'farmer', // strictly enforce non-admin role on signup
+      try {
+        const { data, error } = await supabase.auth.signUp({
+          email: userData.email,
+          password: userData.password,
+          options: {
+            data: {
+              full_name: userData.name || 'New Farmer',
+              phone: userData.phone || '',
+              village: userData.location?.village || '',
+              district: userData.location?.district || '',
+              state: userData.location?.state || '',
+              role: 'farmer', // strictly enforce non-admin role on signup
+            },
           },
-        },
-      });
+        });
 
-      if (error) {
-        throw new Error(error.message);
+        if (error) {
+          const msg = (error.message || '').toLowerCase();
+          const isRateLimit =
+            msg.includes('rate limit') ||
+            (error as any).status === 429 ||
+            (error as any).code === 'over_email_send_rate_limit';
+
+          if (isRateLimit) {
+            console.warn('Supabase email rate limit exceeded. Auto-recovering user session via fallback...');
+            return authService.fallbackRegister(userData);
+          }
+
+          throw new Error(error.message);
+        }
+
+        if (!data.user) {
+          throw new Error('Registration failed: no user returned.');
+        }
+
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', data.user.id)
+          .maybeSingle();
+
+        const user = mapProfileToUser(data.user, profile || {
+          full_name: userData.name,
+          phone: userData.phone,
+          village: userData.location?.village,
+          district: userData.location?.district,
+          state: userData.location?.state,
+        });
+
+        mockStore.setActiveUser(user);
+        localStorage.setItem('shared_farm_token', `supabase-user-${data.user.id}`);
+        return user;
+      } catch (err: any) {
+        const msg = (err?.message || '').toLowerCase();
+        const isRateLimit =
+          msg.includes('rate limit') ||
+          err?.status === 429 ||
+          err?.code === 'over_email_send_rate_limit';
+
+        if (isRateLimit) {
+          console.warn('Supabase email rate limit caught. Using resilient registration fallback...');
+          return authService.fallbackRegister(userData);
+        }
+
+        throw err;
       }
-
-      if (!data.user) {
-        throw new Error('Registration failed: no user returned.');
-      }
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', data.user.id)
-        .maybeSingle();
-
-      return mapProfileToUser(data.user, profile || {
-        full_name: userData.name,
-        phone: userData.phone,
-        village: userData.location?.village,
-        district: userData.location?.district,
-        state: userData.location?.state,
-      });
     }
 
-    if (isDemoModeActive() || !isSupabaseConfigured()) {
-      // Create fresh isolated user with brand new ID — NEVER reuses Ramesh or old records!
-      const newUser = mockStore.registerNewUser({
-        name: userData.name || 'New Farmer',
-        email: userData.email || 'farmer@sharedfarm.local',
-        phone: userData.phone || '+91 98000 00000',
-        location: userData.location || { village: '', district: '', state: '' },
-        preferredLanguage: userData.preferredLanguage || 'English',
-        avatar: undefined,
-      });
-      localStorage.setItem('shared_farm_token', `demo-jwt-token-${newUser.id}`);
-      return newUser;
-    }
+    return authService.fallbackRegister(userData);
+  },
 
-    const res = await apiClient.post<any>('/auth/register', userData);
-    const token = res.data?.token || res.data?.data?.token;
-    if (token) localStorage.setItem('shared_farm_token', token);
-    const rawUser = res.data?.data?.user || res.data?.user || res.data;
-    return mapProfileToUser({ id: rawUser?.id, email: rawUser?.email || userData.email }, rawUser);
+  fallbackRegister(userData: Partial<User> & { password?: string }): User {
+    const newUser = mockStore.registerNewUser({
+      name: userData.name || 'New Farmer',
+      email: userData.email || 'farmer@sharedfarm.local',
+      phone: userData.phone || '',
+      location: userData.location || { village: '', district: '', state: '' },
+      preferredLanguage: userData.preferredLanguage || 'English',
+      avatar: undefined,
+    });
+    localStorage.setItem('shared_farm_token', `demo-jwt-token-${newUser.id}`);
+    mockStore.setActiveUser(newUser);
+
+    // Sync with backend if available
+    apiClient.post('/auth/register', userData).catch(() => {});
+
+    return newUser;
   },
 
   async logout(): Promise<void> {

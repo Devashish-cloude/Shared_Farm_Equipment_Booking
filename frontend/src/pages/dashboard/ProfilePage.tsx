@@ -5,7 +5,7 @@ import { Button } from '../../components/ui/Button';
 import { getAvatarUrl } from '../../lib/avatar';
 import { INDIAN_STATES, getDistrictsForState } from '../../lib/indianLocations';
 import { storageService } from '../../services/storage.service';
-import { isSupabaseConfigured } from '../../lib/supabase';
+import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import {
   User,
   MapPin,
@@ -83,12 +83,22 @@ export const ProfilePage: React.FC = () => {
 
     setIsUploadingAvatar(true);
     try {
+      let uploadedUrl: string | null = null;
       if (isSupabaseConfigured() && user) {
-        const uploadRes = await storageService.uploadAvatar(file, user.id);
-        setFormData((prev) => ({ ...prev, avatar: uploadRes.url }));
-        await updateUser({ avatar: uploadRes.url });
-        toast.success('Profile photo uploaded and saved!');
-      } else {
+        try {
+          const sessionRes = await supabase.auth.getSession();
+          const effectiveUserId = sessionRes.data.session?.user?.id || user.id;
+          const uploadRes = await storageService.uploadAvatar(file, effectiveUserId);
+          uploadedUrl = uploadRes.url;
+          setFormData((prev) => ({ ...prev, avatar: uploadedUrl! }));
+          await updateUser({ avatar: uploadedUrl! });
+          toast.success('Profile photo uploaded and saved!');
+        } catch (storageErr: any) {
+          console.warn('Supabase avatar storage failed, falling back to local photo preview:', storageErr?.message || storageErr);
+        }
+      }
+
+      if (!uploadedUrl) {
         const reader = new FileReader();
         reader.onload = async () => {
           if (typeof reader.result === 'string') {
@@ -97,6 +107,9 @@ export const ProfilePage: React.FC = () => {
             await updateUser({ avatar: dataUrl });
             toast.success('Profile photo updated!');
           }
+        };
+        reader.onerror = () => {
+          toast.error('Failed to read image file');
         };
         reader.readAsDataURL(file);
       }

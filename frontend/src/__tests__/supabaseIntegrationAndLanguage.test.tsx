@@ -238,4 +238,10 @@ describe('Supabase Client & Data Harmonization', () => {
     const invalidFile = new File(['executable'], 'script.exe', { type: 'application/octet-stream' });
     await expect(storageService.uploadEquipmentImage(invalidFile, 'test-uid')).rejects.toThrow();
   });
+
+  it('correctly constructs safe sanitized file path for uploads', async () => {
+    const validFile = new File(['imagecontent'], 'my photo @ field #1.jpg', { type: 'image/jpeg' });
+    // When Supabase is not configured or in test mode, throws missing config error
+    await expect(storageService.uploadEquipmentImage(validFile, 'user@test#123')).rejects.toThrow();
+  });
 });

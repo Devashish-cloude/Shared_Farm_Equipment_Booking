@@ -138,23 +138,33 @@ export const EquipmentForm: React.FC<EquipmentFormProps> = ({
 
     setIsUploading(true);
     try {
+      let uploadedUrl: string | null = null;
+
+      // 1. If Supabase is configured, attempt upload to Supabase Storage
       if (isSupabaseConfigured()) {
-        const sessionRes = await supabase.auth.getSession();
-        const userId = user?.id || sessionRes.data.session?.user?.id;
-        if (!userId) {
-          toast.error('Please sign in to upload equipment photos.');
-          return;
+        try {
+          const sessionRes = await supabase.auth.getSession();
+          const effectiveUserId = sessionRes.data.session?.user?.id || user?.id || 'farmer';
+          const res = await storageService.uploadEquipmentImage(file, effectiveUserId);
+          uploadedUrl = res.url;
+          setImages((prev) => [...prev.filter((img) => !img.includes('images.unsplash.com/photo-1592982537447')), res.url]);
+          toast.success('Equipment photo uploaded successfully!');
+        } catch (storageErr: any) {
+          console.warn('Supabase storage upload failed, falling back to local photo preview:', storageErr?.message || storageErr);
         }
-        const res = await storageService.uploadEquipmentImage(file, userId);
-        setImages((prev) => [...prev.filter((img) => !img.includes('images.unsplash.com/photo-1592982537447')), res.url]);
-        toast.success('Equipment photo uploaded successfully!');
-      } else {
+      }
+
+      // 2. If storage upload did not yield a URL (or Supabase not configured / RLS blocked it), fallback to local Data URL
+      if (!uploadedUrl) {
         const reader = new FileReader();
         reader.onload = () => {
           if (typeof reader.result === 'string') {
             setImages((prev) => [...prev.filter((img) => !img.includes('images.unsplash.com/photo-1592982537447')), reader.result as string]);
             toast.success('Photo added!');
           }
+        };
+        reader.onerror = () => {
+          toast.error('Failed to read image file');
         };
         reader.readAsDataURL(file);
       }

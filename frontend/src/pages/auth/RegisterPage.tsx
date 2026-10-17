@@ -98,8 +98,13 @@ export const RegisterPage: React.FC = () => {
         </div>
 
         {error && (
-          <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700">
-            {error}
+          <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 space-y-1">
+            <p className="font-semibold">{error}</p>
+            {error.toLowerCase().includes('rate limit') && (
+              <p className="text-[11px] text-rose-600 mt-1">
+                <strong>Permanent fix:</strong> In your Supabase Dashboard, go to <strong>Authentication &gt; Providers &gt; Email</strong> and turn OFF <strong>Confirm email</strong>.
+              </p>
+            )}
           </div>
         )}
 

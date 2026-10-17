@@ -28,13 +28,14 @@ export const storageService = {
     }
 
     const cleanFilename = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-    const filePath = `${userId}/${Date.now()}_${cleanFilename}`;
+    const safeUserId = (userId || 'public').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const filePath = `${safeUserId}/${Date.now()}_${cleanFilename}`;
 
     const { error: uploadError } = await supabase.storage
       .from(BUCKET_NAME)
       .upload(filePath, file, {
         cacheControl: '3600',
-        upsert: false,
+        upsert: true,
       });
 
     if (uploadError) {
