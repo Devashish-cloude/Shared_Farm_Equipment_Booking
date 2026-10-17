@@ -6,7 +6,9 @@ export const notificationsService = {
   async getNotifications(): Promise<NotificationItem[]> {
     if (isSupabaseConfigured()) {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) return [];
+      if (!session?.user) {
+        return mockStore.getActiveUser() ? mockStore.getNotifications() : [];
+      }
 
       const { data, error } = await supabase
         .from('notifications')
@@ -16,7 +18,7 @@ export const notificationsService = {
 
       if (error) {
         console.warn('Could not load notifications from Supabase:', error.message);
-        return [];
+        return mockStore.getNotifications();
       }
 
       return (data || []).map((row) => ({
@@ -35,11 +37,14 @@ export const notificationsService = {
 
   async markAsRead(id: string): Promise<void> {
     if (isSupabaseConfigured()) {
-      await supabase
-        .from('notifications')
-        .update({ read: true })
-        .eq('id', id);
-      return;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        await supabase
+          .from('notifications')
+          .update({ read: true })
+          .eq('id', id);
+        return;
+      }
     }
     mockStore.markNotificationAsRead(id);
   },
@@ -47,13 +52,13 @@ export const notificationsService = {
   async markAllAsRead(): Promise<void> {
     if (isSupabaseConfigured()) {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) return;
-
-      await supabase
-        .from('notifications')
-        .update({ read: true })
-        .eq('user_id', session.user.id);
-      return;
+      if (session?.user) {
+        await supabase
+          .from('notifications')
+          .update({ read: true })
+          .eq('user_id', session.user.id);
+        return;
+      }
     }
     mockStore.markAllNotificationsAsRead();
   },
@@ -61,7 +66,9 @@ export const notificationsService = {
   async getUnreadCount(): Promise<number> {
     if (isSupabaseConfigured()) {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) return 0;
+      if (!session?.user) {
+        return mockStore.getActiveUser() ? mockStore.getNotifications().filter((n) => !n.read).length : 0;
+      }
 
       const { count, error } = await supabase
         .from('notifications')

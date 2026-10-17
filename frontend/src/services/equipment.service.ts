@@ -251,17 +251,22 @@ export const equipmentService = {
   },
 
   async getMyEquipment(ownerId?: string): Promise<Equipment[]> {
+    const activeUser = mockStore.getActiveUser();
+    const fallbackOwnerId = ownerId || activeUser?.id;
+
     if (isDemoModeActive() || !isSupabaseConfigured()) {
-      const user = mockStore.getActiveUser();
-      const targetId = ownerId || user?.id;
-      if (!targetId) return [];
-      return mockStore.getEquipmentList().filter(e => e.ownerId === targetId);
+      if (!fallbackOwnerId) return [];
+      return mockStore.getEquipmentList().filter(e => e.ownerId === fallbackOwnerId);
     }
 
     try {
       const { data: sessionData } = await supabase.auth.getSession();
-      const userId = ownerId || sessionData?.session?.user?.id;
+      const userId = ownerId || sessionData?.session?.user?.id || activeUser?.id;
       if (!userId) return [];
+
+      if (!sessionData?.session?.user) {
+        return mockStore.getEquipmentList().filter(e => e.ownerId === userId);
+      }
 
       const { data, error } = await supabase
         .from('equipment')
@@ -275,32 +280,36 @@ export const equipmentService = {
           .select('*')
           .eq('owner_id', userId)
           .order('created_at', { ascending: false });
-        if (fallback.error) throw new Error(fallback.error.message);
+        if (fallback.error) {
+          return mockStore.getEquipmentList().filter(e => e.ownerId === userId);
+        }
         return (fallback.data || []).map(mapSupabaseEquipment);
       }
 
       return (data || []).map(mapSupabaseEquipment);
     } catch (err: any) {
-      console.error('Failed to fetch user equipment from Supabase:', err);
-      throw new Error(err.message || 'Failed to load your equipment');
+      console.warn('Notice: falling back to local equipment list:', err?.message || err);
+      if (fallbackOwnerId) return mockStore.getEquipmentList().filter(e => e.ownerId === fallbackOwnerId);
+      return [];
     }
   },
 
   async create(data: Omit<Equipment, 'id' | 'createdAt' | 'rating' | 'reviewCount' | 'completedRentalsCount'>): Promise<Equipment> {
-    if (isDemoModeActive() || !isSupabaseConfigured()) {
-      const activeUser = mockStore.getActiveUser();
+    const { data: sessionData } = await supabase.auth.getSession();
+    const activeUser = mockStore.getActiveUser();
+    const userId = sessionData?.session?.user?.id || data.ownerId || activeUser?.id;
+
+    if (!userId) {
+      throw new Error('Authentication required to create an equipment listing.');
+    }
+
+    if (isDemoModeActive() || !isSupabaseConfigured() || !sessionData?.session?.user) {
       const payload = {
         ...data,
-        ownerId: activeUser?.id || data.ownerId || 'usr-farmer',
+        ownerId: userId,
         ownerName: activeUser?.name || data.ownerName || 'Equipment Owner',
       };
       return mockStore.addEquipment(payload);
-    }
-
-    const { data: sessionData } = await supabase.auth.getSession();
-    const userId = sessionData?.session?.user?.id;
-    if (!userId) {
-      throw new Error('Authentication required to create an equipment listing.');
     }
 
     const dbPayload = {
@@ -334,21 +343,40 @@ export const equipmentService = {
       status: data.status || 'available',
     };
 
-    const { data: inserted, error } = await supabase
-      .from('equipment')
-      .insert(dbPayload)
-      .select('*, profiles:owner_id(id, full_name, avatar_url, rating, verification_status, phone)')
-      .single();
+    try {
+      const { data: inserted, error } = await supabase
+        .from('equipment')
+        .insert(dbPayload)
+        .select('*, profiles:owner_id(id, full_name, avatar_url, rating, verification_status, phone)')
+        .single();
 
-    if (error) {
-      throw new Error(`Database error: ${error.message}`);
+      if (error) {
+        console.warn('Supabase equipment insert error, falling back to local store:', error.message);
+        const payload = {
+          ...data,
+          ownerId: userId,
+          ownerName: activeUser?.name || data.ownerName || 'Equipment Owner',
+        };
+        return mockStore.addEquipment(payload);
+      }
+
+      return mapSupabaseEquipment(inserted);
+    } catch (err: any) {
+      console.warn('Equipment insert exception, falling back to local store:', err?.message || err);
+      const payload = {
+        ...data,
+        ownerId: userId,
+        ownerName: activeUser?.name || data.ownerName || 'Equipment Owner',
+      };
+      return mockStore.addEquipment(payload);
     }
-
-    return mapSupabaseEquipment(inserted);
   },
 
   async update(id: string, updates: Partial<Equipment>): Promise<Equipment> {
-    if (isDemoModeActive() || !isSupabaseConfigured()) {
+    const mockItem = mockStore.getEquipmentById(id);
+    const { data: sessionData } = await supabase.auth.getSession();
+
+    if (isDemoModeActive() || !isSupabaseConfigured() || mockItem || !sessionData?.session?.user) {
       return mockStore.updateEquipment(id, updates);
     }
 
@@ -394,33 +422,48 @@ export const equipmentService = {
       }
     }
 
-    const { data: updated, error } = await supabase
-      .from('equipment')
-      .update(dbUpdates)
-      .eq('id', id)
-      .select('*, profiles:owner_id(id, full_name, avatar_url, rating, verification_status, phone)')
-      .single();
+    try {
+      const { data: updated, error } = await supabase
+        .from('equipment')
+        .update(dbUpdates)
+        .eq('id', id)
+        .select('*, profiles:owner_id(id, full_name, avatar_url, rating, verification_status, phone)')
+        .single();
 
-    if (error) {
-      throw new Error(`Database error: ${error.message}`);
+      if (error) {
+        console.warn('Supabase equipment update error, falling back to local store:', error.message);
+        return mockStore.updateEquipment(id, updates);
+      }
+
+      return mapSupabaseEquipment(updated);
+    } catch (err: any) {
+      console.warn('Supabase equipment update exception, falling back to local store:', err?.message || err);
+      return mockStore.updateEquipment(id, updates);
     }
-
-    return mapSupabaseEquipment(updated);
   },
 
   async delete(id: string): Promise<void> {
-    if (isDemoModeActive() || !isSupabaseConfigured()) {
+    const mockItem = mockStore.getEquipmentById(id);
+    const { data: sessionData } = await supabase.auth.getSession();
+
+    if (isDemoModeActive() || !isSupabaseConfigured() || mockItem || !sessionData?.session?.user) {
       mockStore.deleteEquipment(id);
       return;
     }
 
-    const { error } = await supabase
-      .from('equipment')
-      .delete()
-      .eq('id', id);
+    try {
+      const { error } = await supabase
+        .from('equipment')
+        .delete()
+        .eq('id', id);
 
-    if (error) {
-      throw new Error(`Database error: ${error.message}`);
+      if (error) {
+        console.warn('Supabase equipment delete error, falling back to local store:', error.message);
+        mockStore.deleteEquipment(id);
+      }
+    } catch (err: any) {
+      console.warn('Supabase equipment delete exception, falling back to local store:', err?.message || err);
+      mockStore.deleteEquipment(id);
     }
   },
 

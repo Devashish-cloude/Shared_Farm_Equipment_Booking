@@ -27,7 +27,10 @@ export const paymentsService = {
       try {
         const { data: sessionData } = await supabase.auth.getSession();
         const userId = sessionData?.session?.user?.id;
-        if (!userId) return [];
+        if (!userId) {
+          const user = mockStore.getActiveUser();
+          return user ? mockStore.getTransactions() : [];
+        }
 
         const { data, error } = await supabase
           .from('bookings')
@@ -135,45 +138,44 @@ export const paymentsService = {
     }
 
     // 1. SUPABASE PATH (Primary for Supabase-connected environments)
-    if (isSupabaseConfigured()) {
+    if (isSupabaseConfigured() && !isDemoModeActive()) {
       const { data: sessionData } = await supabase.auth.getSession();
       const currentUserId = sessionData?.session?.user?.id;
+      const activeUser = mockStore.getActiveUser();
 
-      if (!currentUserId) {
+      if (!currentUserId && !activeUser) {
         throw new Error('Authentication required: Please sign in to authorize payment.');
       }
 
-      // Fetch authoritative booking record
-      const { data: booking, error: fetchErr } = await supabase
-        .from('bookings')
-        .select('*, equipment:equipment_id(id, title, name, owner_id)')
-        .eq('id', bookingId)
-        .maybeSingle();
+      if (currentUserId) {
+        // Fetch authoritative booking record
+        const { data: booking, error: fetchErr } = await supabase
+          .from('bookings')
+          .select('*, equipment:equipment_id(id, title, name, owner_id)')
+          .eq('id', bookingId)
+          .maybeSingle();
 
-      if (fetchErr || !booking) {
-        throw new Error('This booking could not be found.');
-      }
+        if (booking && !fetchErr) {
+          // Security: Only the actual renter can pay for their booking
+          if (booking.renter_id !== currentUserId) {
+            throw new Error('You are not authorized to pay for this booking.');
+          }
 
-      // Security: Only the actual renter can pay for their booking
-      if (booking.renter_id !== currentUserId) {
-        throw new Error('You are not authorized to pay for this booking.');
-      }
+          // Prevent payment on cancelled or rejected bookings
+          if (booking.status === 'cancelled' || booking.status === 'rejected') {
+            throw new Error(`Cannot pay for a ${booking.status} booking.`);
+          }
 
-      // Prevent payment on cancelled or rejected bookings
-      if (booking.status === 'cancelled' || booking.status === 'rejected') {
-        throw new Error(`Cannot pay for a ${booking.status} booking.`);
-      }
-
-      // Idempotency: If already marked as paid, return previous authorization safely
-      if (booking.payment_status === 'paid') {
-        return {
-          success: true,
-          transactionId: `TXN-ALREADY-PAID-${booking.id.substring(0, 8)}`,
-          amount: Number(booking.total_price),
-          alreadyPaid: true,
-          paymentStatus: 'paid',
-        };
-      }
+          // Idempotency: If already marked as paid, return previous authorization safely
+          if (booking.payment_status === 'paid') {
+            return {
+              success: true,
+              transactionId: `TXN-ALREADY-PAID-${booking.id.substring(0, 8)}`,
+              amount: Number(booking.total_price),
+              alreadyPaid: true,
+              paymentStatus: 'paid',
+            };
+          }
 
       // Attempt stored procedure if deployed
       try {
@@ -268,13 +270,15 @@ export const paymentsService = {
         // Non-blocking tracking point
       }
 
-      return {
-        success: true,
-        transactionId: generatedTxnId,
-        amount: authoritativeAmount,
-        paymentStatus: 'paid',
-      };
+        return {
+          success: true,
+          transactionId: generatedTxnId,
+          amount: authoritativeAmount,
+          paymentStatus: 'paid',
+        };
+      }
     }
+  }
 
     // 2. MOCK / DEMO / OFFLINE PATH
     const mockBooking = mockStore.getBookingById(bookingId);

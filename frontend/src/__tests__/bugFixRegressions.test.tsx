@@ -3,6 +3,7 @@ import { authService, isDemoModeActive, mapProfileToUser } from '../services/aut
 import { mockStore } from '../services/mockStore';
 import { equipmentService } from '../services/equipment.service';
 import { bookingsService } from '../services/bookings.service';
+import { paymentsService } from '../services/payments.service';
 import { translations, SUPPORTED_LANGUAGES } from '../i18n/translations';
 import { getAvatarUrl } from '../lib/avatar';
 import {
@@ -322,6 +323,106 @@ describe('Production Bug Fixes & Regression Test Suite', () => {
       expect(active?.name).toBe('Farmer');
       expect(active?.name.split(' ')[0]).toBe('Farmer');
       expect(active?.location.village).toBeDefined();
+    });
+  });
+
+  // --------------------------------------------------------------------------
+  // TEST J: PLATFORM FALLBACK AUTH & BOOKING FLOW (JANHAVI RATE LIMIT RECOVERY)
+  // --------------------------------------------------------------------------
+  describe('Test J: Platform Fallback Auth & Booking Flow', () => {
+    it('allows a user registered via fallback platform session to create bookings and pay without authentication errors', async () => {
+      // Simulate user Janhavi registered via platform fallback session
+      const janhavi = await authService.register({
+        name: 'Janhavi',
+        email: 'janhavi@test.farm',
+        phone: '+91 98220 99999',
+        location: { village: 'Dindori', district: 'Nashik', state: 'Maharashtra' },
+        password: 'password123',
+      });
+
+      expect(janhavi).toBeDefined();
+      expect(janhavi.name).toBe('Janhavi');
+
+      // Create a booking as Janhavi
+      const booking = await bookingsService.createBooking({
+        equipmentId: 'eq-tractor-john-deere-5050d',
+        equipmentName: 'John Deere 5050D 4WD Tractor',
+        equipmentCategory: 'Tractors',
+        equipmentImage: '/images/tractor.jpg',
+        renterId: janhavi.id,
+        renterName: janhavi.name,
+        renterPhone: janhavi.phone,
+        renterVillage: `${janhavi.location.village}, ${janhavi.location.district}`,
+        ownerId: 'usr-ramesh-01',
+        ownerName: 'Ramesh Patel',
+        ownerPhone: '+91 98765 43210',
+        startDate: '2026-10-20T08:00:00Z',
+        endDate: '2026-10-20T14:00:00Z',
+        durationHours: 6,
+        withOperator: true,
+        basePrice: 2700,
+        operatorPrice: 720,
+        platformFee: 137,
+        securityDeposit: 2000,
+        totalPrice: 5557,
+        renterNotes: 'Need 6 hours for plowing.',
+      });
+
+      expect(booking).toBeDefined();
+      expect(booking.id).toBeDefined();
+      expect(booking.renterId).toBe(janhavi.id);
+      expect(booking.totalPrice).toBe(5557);
+
+      // Verify the booking is retrieved in Janhavi's rentals
+      const myRentals = await bookingsService.getMyRentals(janhavi.id);
+      expect(myRentals.length).toBeGreaterThan(0);
+      expect(myRentals.some(b => b.id === booking.id)).toBe(true);
+
+      // Verify Janhavi can authorize escrow payment
+      const paymentRes = await paymentsService.simulatePayment(booking.id, 'upi');
+      expect(paymentRes.success).toBe(true);
+      expect(paymentRes.paymentStatus).toBe('paid');
+    });
+
+    it('allows a user registered via fallback platform session to list equipment', async () => {
+      const activeUser = await authService.register({
+        name: 'Janhavi',
+        email: 'janhavi.owner@test.farm',
+        phone: '+91 98220 99999',
+        location: { village: 'Dindori', district: 'Nashik', state: 'Maharashtra' },
+        password: 'password123',
+      });
+      expect(activeUser).toBeDefined();
+
+      const newListing = await equipmentService.create({
+        title: 'Mahindra 575 DI Tractor',
+        category: 'Tractors',
+        description: 'Dependable workhorse',
+        make: 'Mahindra',
+        model: '575 DI',
+        year: 2023,
+        condition: 'Excellent',
+        pricePerHour: 450,
+        pricePerDay: 3200,
+        securityDeposit: 2000,
+        operatorAvailable: true,
+        operatorCostPerHour: 120,
+        minRentalHours: 2,
+        images: [],
+        specifications: {},
+        location: { ...activeUser.location, approximateCoordinates: [20.0063, 73.7898] },
+        ownerId: activeUser.id,
+        ownerName: activeUser.name,
+        ownerRating: 5.0,
+        ownerVerified: true,
+        status: 'available',
+      });
+
+      expect(newListing.id).toBeDefined();
+      expect(newListing.title).toBe('Mahindra 575 DI Tractor');
+
+      const myListings = await equipmentService.getMyEquipment(activeUser.id);
+      expect(myListings.some(e => e.id === newListing.id)).toBe(true);
     });
   });
 });
