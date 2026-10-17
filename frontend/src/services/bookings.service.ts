@@ -3,6 +3,16 @@ import { mockStore } from './mockStore';
 import { isDemoModeActive } from './auth.service';
 import { Booking } from '../types';
 import { resolveEquipmentImage } from '../lib/equipmentImages';
+import { DEMO_EQUIPMENT_SLUG_MAP } from './equipment.service';
+
+export const DEMO_OWNER_SLUG_MAP: Record<string, string> = {
+  'usr-ramesh-01': '00000000-0000-4000-8000-000000000001',
+  'usr-gurpreet-02': '00000000-0000-4000-8000-000000000002',
+  'usr-balwinder-03': '00000000-0000-4000-8000-000000000003',
+  'usr-sunita-04': '00000000-0000-4000-8000-000000000004',
+  'usr-vikram-05': '00000000-0000-4000-8000-000000000005',
+  'usr-suresh-06': '00000000-0000-4000-8000-000000000006',
+};
 
 /**
  * Maps a Supabase booking row with nested equipment, renter, and owner profiles
@@ -174,14 +184,18 @@ export const bookingsService = {
       throw new Error('Authentication required to book equipment.');
     }
 
-    // Call atomic function: creates booking with SELECT ... FOR UPDATE and conflict prevention
-    const { data: rpcData, error: rpcError } = await supabase.rpc('create_booking_atomic', {
-      p_equipment_id: bookingData.equipmentId,
-      p_start_date: bookingData.startDate,
-      p_end_date: bookingData.endDate,
-      p_with_operator: Boolean(bookingData.withOperator),
-      p_notes: bookingData.renterNotes || null,
-    });
+    const targetEquipmentId = DEMO_EQUIPMENT_SLUG_MAP[bookingData.equipmentId] || bookingData.equipmentId;
+    const targetOwnerId = DEMO_OWNER_SLUG_MAP[bookingData.ownerId] || bookingData.ownerId;
+
+    try {
+      // Call atomic function: creates booking with SELECT ... FOR UPDATE and conflict prevention
+      const { data: rpcData, error: rpcError } = await supabase.rpc('create_booking_atomic', {
+        p_equipment_id: targetEquipmentId,
+        p_start_date: bookingData.startDate,
+        p_end_date: bookingData.endDate,
+        p_with_operator: Boolean(bookingData.withOperator),
+        p_notes: bookingData.renterNotes || null,
+      });
 
     if (rpcError) {
       if (
@@ -189,9 +203,9 @@ export const bookingsService = {
         (rpcError.message.includes('does not exist') || rpcError.message.includes('Could not find'))
       ) {
         const insertPayload = {
-          equipment_id: bookingData.equipmentId,
+          equipment_id: targetEquipmentId,
           renter_id: sessionData.session.user.id,
-          owner_id: bookingData.ownerId,
+          owner_id: targetOwnerId,
           start_date: bookingData.startDate,
           end_date: bookingData.endDate,
           duration_hours: bookingData.durationHours,
@@ -231,6 +245,13 @@ export const bookingsService = {
     }
 
     return mapSupabaseBooking(rpcData);
+    } catch (err: any) {
+      // If booking was attempted on an unseeded demo item, seamlessly fallback to local store
+      if (bookingData.equipmentId.startsWith('eq-')) {
+        return mockStore.createBooking(bookingData);
+      }
+      throw err;
+    }
   },
 
   async acceptRequest(bookingId: string): Promise<Booking> {

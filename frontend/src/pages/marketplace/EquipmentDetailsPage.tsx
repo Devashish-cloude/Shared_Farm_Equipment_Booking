@@ -64,7 +64,7 @@ export const EquipmentDetailsPage: React.FC = () => {
           setSimilarEquipment(all.filter((e) => e.id !== item.id).slice(0, 3));
         }
       } catch (err: any) {
-        toast.error(t('details.requestFailed', 'Failed to load equipment details'));
+        toast.error(t('details.loadFailed', 'Failed to load equipment details'));
       } finally {
         setIsLoading(false);
       }

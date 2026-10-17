@@ -70,6 +70,21 @@ export function mapSupabaseEquipment(row: any): Equipment {
   };
 }
 
+export const DEMO_EQUIPMENT_SLUG_MAP: Record<string, string> = {
+  'eq-tractor-01': '11111111-1111-4111-8111-111111111101',
+  'eq-tractor-02': '11111111-1111-4111-8111-111111111102',
+  'eq-harvester-01': '11111111-1111-4111-8111-111111111103',
+  'eq-rotavator-01': '11111111-1111-4111-8111-111111111104',
+  'eq-seeddrill-01': '11111111-1111-4111-8111-111111111105',
+  'eq-sprayer-01': '11111111-1111-4111-8111-111111111106',
+  'eq-cultivator-01': '11111111-1111-4111-8111-111111111107',
+  'eq-plough-01': '11111111-1111-4111-8111-111111111108',
+};
+
+export const DEMO_EQUIPMENT_UUID_TO_SLUG: Record<string, string> = Object.entries(
+  DEMO_EQUIPMENT_SLUG_MAP
+).reduce((acc, [slug, uuid]) => ({ ...acc, [uuid]: slug }), {});
+
 export const equipmentService = {
   async getAll(params?: EquipmentFilterParams): Promise<Equipment[]> {
     if (isDemoModeActive() || !isSupabaseConfigured()) {
@@ -168,17 +183,28 @@ export const equipmentService = {
       }
 
       const { data, error } = await query;
+      if (!error && data && data.length > 0) {
+        return data.map(mapSupabaseEquipment);
+      }
+
+      // If Supabase table is empty, smoothly fallback to mock store listings
+      if (!error && (!data || data.length === 0)) {
+        return mockStore.getEquipmentList();
+      }
+
       if (error) {
         // Fallback to select without profile join if foreign key naming differs
         const simpleQuery = await supabase.from('equipment').select('*');
-        if (simpleQuery.error) throw new Error(simpleQuery.error.message);
-        return (simpleQuery.data || []).map(mapSupabaseEquipment);
+        if (!simpleQuery.error && simpleQuery.data && simpleQuery.data.length > 0) {
+          return simpleQuery.data.map(mapSupabaseEquipment);
+        }
+        return mockStore.getEquipmentList();
       }
 
       return (data || []).map(mapSupabaseEquipment);
     } catch (err: any) {
-      console.error('Failed to fetch equipment listings from Supabase:', err);
-      throw new Error(err.message || 'Failed to load equipment');
+      console.warn('Notice: falling back to demo equipment:', err?.message || err);
+      return mockStore.getEquipmentList();
     }
   },
 
@@ -188,24 +214,40 @@ export const equipmentService = {
       return item || null;
     }
 
-    try {
-      const { data, error } = await supabase
-        .from('equipment')
-        .select('*, profiles:owner_id(id, full_name, avatar_url, rating, verification_status, phone)')
-        .eq('id', id)
-        .maybeSingle();
+    const resolvedId = DEMO_EQUIPMENT_SLUG_MAP[id] || id;
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(resolvedId);
 
-      if (error) {
-        const simple = await supabase.from('equipment').select('*').eq('id', id).maybeSingle();
-        if (simple.error) throw new Error(simple.error.message);
-        return simple.data ? mapSupabaseEquipment(simple.data) : null;
+    if (isUuid) {
+      try {
+        const { data, error } = await supabase
+          .from('equipment')
+          .select('*, profiles:owner_id(id, full_name, avatar_url, rating, verification_status, phone)')
+          .eq('id', resolvedId)
+          .maybeSingle();
+
+        if (data) {
+          return mapSupabaseEquipment(data);
+        }
+
+        if (error) {
+          const simple = await supabase.from('equipment').select('*').eq('id', resolvedId).maybeSingle();
+          if (simple.data) {
+            return mapSupabaseEquipment(simple.data);
+          }
+        }
+      } catch (err) {
+        console.warn(`Notice: query for equipment ${resolvedId}:`, err);
       }
-
-      return data ? mapSupabaseEquipment(data) : null;
-    } catch (err: any) {
-      console.error(`Failed to fetch equipment ${id}:`, err);
-      throw new Error(err.message || 'Failed to load equipment details');
     }
+
+    // Gracefully fallback to mockStore demo item if not found in Supabase
+    const fallbackSlug = DEMO_EQUIPMENT_UUID_TO_SLUG[id] || id;
+    const fallbackItem = mockStore.getEquipmentById(fallbackSlug);
+    if (fallbackItem) {
+      return fallbackItem;
+    }
+
+    return null;
   },
 
   async getMyEquipment(ownerId?: string): Promise<Equipment[]> {
