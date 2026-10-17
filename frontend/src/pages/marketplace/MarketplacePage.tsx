@@ -5,7 +5,9 @@ import { Equipment, EquipmentCategory } from '../../types';
 import { EquipmentCard } from '../../components/equipment/EquipmentCard';
 import { FilterPanel, FilterState } from '../../components/equipment/FilterPanel';
 import { EquipmentMap } from '../../components/equipment/EquipmentMap';
+import { LocationAutocompleteInput } from '../../components/ui/LocationAutocompleteInput';
 import { EquipmentCardSkeleton } from '../../components/ui/LoadingSkeleton';
+
 import { EmptyState } from '../../components/ui/EmptyState';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { Button } from '../../components/ui/Button';
@@ -184,18 +186,17 @@ export const MarketplacePage: React.FC = () => {
             />
           </div>
 
-          <div className="sm:col-span-4 relative">
-            <MapPin className="w-4 h-4 text-[#347653] absolute left-3 top-3.5" />
-            <input
-              type="text"
+          <div className="sm:col-span-4">
+            <LocationAutocompleteInput
               value={filters.location}
-              onChange={(e) => setFilters({ ...filters, location: e.target.value })}
+              onChange={(val) => setFilters({ ...filters, location: val })}
               placeholder="Filter by Village or District..."
-              className="w-full text-xs pl-9 pr-3 py-3 rounded-xl border border-[#CBD5C7] bg-[#F7F8F2]/60 text-[#25312A] focus:outline-none focus:ring-2 focus:ring-[#164B35]"
+              className="py-3"
             />
           </div>
         </div>
       </div>
+
 
       {/* Main Content: Left Filter Panel (Desktop) + Right Results */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">

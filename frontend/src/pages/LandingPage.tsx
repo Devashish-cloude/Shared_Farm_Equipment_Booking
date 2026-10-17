@@ -18,7 +18,9 @@ import {
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { EquipmentCard } from '../components/equipment/EquipmentCard';
+import { LocationAutocompleteInput } from '../components/ui/LocationAutocompleteInput';
 import { mockStore } from '../services/mockStore';
+
 import { useLanguage } from '../context/LanguageContext';
 import { EquipmentCategory } from '../types';
 
@@ -86,17 +88,14 @@ export const LandingPage: React.FC = () => {
                       <label className="block text-[11px] font-bold text-[#25312A] uppercase tracking-wide">
                         {t('hero.location')}
                       </label>
-                      <div className="relative">
-                        <MapPin className="w-4 h-4 text-[#347653] absolute left-3 top-3" />
-                        <input
-                          type="text"
-                          value={searchLocation}
-                          onChange={(e) => setSearchLocation(e.target.value)}
-                          placeholder={t('hero.locationPlaceholder')}
-                          className="w-full text-xs pl-9 pr-3 py-2.5 bg-[#F7F8F2] rounded-xl border border-[#E2E7DE] focus:outline-none focus:ring-2 focus:ring-[#164B35] text-[#25312A] font-medium"
-                        />
-                      </div>
+                      <LocationAutocompleteInput
+                        value={searchLocation}
+                        onChange={setSearchLocation}
+                        placeholder={t('hero.locationPlaceholder')}
+                        className="py-2.5"
+                      />
                     </div>
+
 
                     {/* Category input */}
                     <div className="space-y-1">

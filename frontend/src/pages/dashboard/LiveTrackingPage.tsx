@@ -5,6 +5,8 @@ import L from 'leaflet';
 import { mockStore } from '../../services/mockStore';
 import { trackingService } from '../../services/tracking.service';
 import { bookingsService } from '../../services/bookings.service';
+import { UnifiedLiveTrackingMap } from '../../components/tracking/UnifiedLiveTrackingMap';
+
 import { Booking, TelemetryData } from '../../types';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { Button } from '../../components/ui/Button';
@@ -215,40 +217,15 @@ export const LiveTrackingPage: React.FC = () => {
           <span>Last Telemetry Packet: {telemetry?.lastUpdated || 'Just now'}</span>
         </div>
 
-        <div className="h-[460px] w-full rounded-2xl overflow-hidden relative">
-          <MapContainer
-            center={[currentLat, currentLng]}
-            zoom={15}
-            scrollWheelZoom={false}
-            className="w-full h-full"
-          >
-            <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            />
-
-            {/* Farm parcel perimeter circle */}
-            <Circle
-              center={[currentLat, currentLng]}
-              radius={280}
-              pathOptions={{ color: '#347653', fillColor: '#B8D96B', fillOpacity: 0.15 }}
-            />
-
-            {/* Live Tractor Marker */}
-            <Marker position={[currentLat, currentLng]} icon={tractorMarkerIcon}>
-              <Popup>
-                <div className="p-1 text-xs space-y-1">
-                  <h4 className="font-bold text-[#164B35]">{selectedBooking.equipmentName}</h4>
-                  <p className="text-[11px] text-[#526058]">Operating in Mogri / Anand parcel</p>
-                  <p className="text-[11px] font-semibold text-emerald-700">
-                    Engine Running &bull; {telemetry?.speedKmph?.toFixed(1) || '7.2'} km/h
-                  </p>
-                </div>
-              </Popup>
-            </Marker>
-          </MapContainer>
-        </div>
+        <UnifiedLiveTrackingMap
+          currentLat={currentLat}
+          currentLng={currentLng}
+          equipmentName={selectedBooking.equipmentName}
+          telemetry={telemetry}
+          parcelDescription="Operating in Anand agricultural parcel"
+        />
       </div>
+
     </div>
   );
 };

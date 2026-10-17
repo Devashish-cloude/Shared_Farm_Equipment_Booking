@@ -13,6 +13,7 @@ import { PriceDisplay } from '../../components/ui/PriceDisplay';
 import { Button } from '../../components/ui/Button';
 import { formatCurrency, formatDate } from '../../lib/utils';
 import { EquipmentCard } from '../../components/equipment/EquipmentCard';
+import { SingleEquipmentLocationMap } from '../../components/maps/SingleEquipmentLocationMap';
 import {
   MapPin,
   Calendar,
@@ -284,8 +285,19 @@ export const EquipmentDetailsPage: React.FC = () => {
             </div>
           </div>
 
+          {/* Interactive Geospatial Machinery Location & Field Vicinity Map */}
+          <SingleEquipmentLocationMap
+            coordinates={equipment.location.approximateCoordinates}
+            village={equipment.location.village}
+            district={equipment.location.district}
+            state={equipment.location.state}
+            equipmentTitle={equipment.title}
+            pricePerHour={equipment.pricePerHour}
+          />
+
           {/* Verified Provider Card */}
           <div className="bg-[#F0F5F2] p-6 rounded-2xl border border-[#BCD3C6] space-y-4">
+
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <img

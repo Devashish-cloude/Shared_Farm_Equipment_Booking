@@ -77,12 +77,12 @@ The platform supports tractors, harvesters, rotavators, seed drills, sprayers, c
 - **Frontend:** React + Vite + TypeScript + Tailwind CSS
 - **Backend:** Node.js + Express + TypeScript
 - **Database:** PostgreSQL (Supabase-hosted PostgreSQL is an option)
-- **Authentication:** Supabase Auth OR backend JWT + bcrypt; choose one approach
-- **Maps:** Leaflet + OpenStreetMap for the initial prototype
+- **Maps & Geospatial:** Dual-Engine Architecture — Google Maps Platform (Maps JavaScript API, Places API, Satellite/Terrain imagery) with seamless zero-downtime Leaflet + OpenStreetMap fallback
 - **Payments:** Razorpay test mode, added after booking works
 - **Image storage:** Cloudinary or Supabase Storage
 - **Testing:** Vitest/React Testing Library and a Node API test framework
 - **Version control:** Git + GitHub
+
 
 ## 5. Main pages
 
@@ -315,7 +315,43 @@ Fill in the actual commands after the stack is finalized:
 8. Open the frontend URL printed in the terminal.
 
 Never commit real `.env` files.
+ 
+## 15. Google Maps Platform Setup & Security Guide
+
+The platform features an intelligent dual-engine geospatial layer that uses Google Maps for rich satellite views, interactive price markers, and Places autocomplete, while automatically failing over to Leaflet & OpenStreetMap if the key is restricted, unbilled, or unconfigured.
+
+### Environment Variable
+```bash
+# In root .env and frontend/.env:
+VITE_GOOGLE_MAPS_API_KEY=AIzaSy...
+```
+
+### Local Setup Instructions
+1. Copy `.env.example` to `.env` and `frontend/.env.example` to `frontend/.env`.
+2. Set `VITE_GOOGLE_MAPS_API_KEY` to your Google Cloud API key.
+3. Start Vite: `npm run dev --workspace=frontend`.
+4. The app dynamically detects the key and loads `maps.googleapis.com/maps/api/js?key=...&libraries=places`.
+
+### Required Google Cloud APIs
+In [Google Cloud Console](https://console.cloud.google.com/google/maps-apis/overview), enable the following APIs:
+1. **Maps JavaScript API** (Required for interactive maps, satellite layers, and custom pins).
+2. **Places API / Places API (New)** (Required for village and district search autocomplete).
+3. **Geocoding API** (Recommended for translating farmer addresses to GPS coordinates).
+4. **Billing**: Google Cloud requires billing to be linked to the project (`https://console.cloud.google.com/project/_/billing/enable`). If billing is missing, Google Maps triggers `gm_authFailure` and the platform automatically falls back to OpenStreetMap.
+
+### Key Security & Restrictions (Mandatory for Production)
+Never leave browser API keys unrestricted:
+1. **Application Restrictions**: Set to **Websites (HTTP referrers)** and add:
+   - `https://shared-farm-equipment-booking.vercel.app/*`
+   - `https://*.vercel.app/*`
+   - `http://localhost:5173/*` (for local development)
+2. **API Restrictions**: Under "Restrict key", select only:
+   - Maps JavaScript API
+   - Places API (or Places API New)
+   - Geocoding API
 
 ---
 
 **Project principle:** Build one reliable shared-equipment marketplace with one account and one dashboard first. Add real GPS/IoT and AI only after booking, availability, and rental-session workflows are correct.
+
+
